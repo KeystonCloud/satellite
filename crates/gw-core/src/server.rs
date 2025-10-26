@@ -1,0 +1,23 @@
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct ServerConfig {
+    pub port: u16,
+    pub host: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ServerSettings {
+    pub server: ServerConfig,
+}
+
+impl ServerSettings {
+    pub fn new() -> Result<Self, config::ConfigError> {
+        let config_builder = config::Config::builder()
+            .add_source(config::File::with_name("config/default"))
+            .add_source(config::Environment::with_prefix("GW").separator("__"))
+            .build()?;
+
+        config_builder.try_deserialize()
+    }
+}

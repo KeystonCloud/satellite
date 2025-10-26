@@ -1,0 +1,10 @@
+[package]
+name = "gateway"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gw-core = { path = "../crates/gw-core" }
+api-nodes = { path = "../crates/api-nodes" }
+axum = "0.8.6"
+tokio = { version = "1.48.0", features = ["full"] }

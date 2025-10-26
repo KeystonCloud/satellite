@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = [
+    "gateway",
+    "crates/gw-core",
+    "crates/api-nodes",
+]
