@@ -1,3 +1,7 @@
 [server]
 port = 5000
 host = "0.0.0.0"
+
+[node_health]
+staleness_seconds = 90
+check_interval_seconds = 60

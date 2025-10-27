@@ -384,6 +384,7 @@ dependencies = [
  "chrono",
  "config",
  "serde",
+ "tokio",
 ]
 
 [[package]]

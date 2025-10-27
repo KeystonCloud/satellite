@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use gw_core::{node::NodeRegistry, server::ServerSettings};
+use gw_core::{node::NodeRegistry, node::periodic_health_check, server::ServerSettings};
 
 #[tokio::main]
 async fn main() {
@@ -18,6 +18,17 @@ async fn main() {
 
     let node_registry: NodeRegistry = Arc::new(Mutex::new(HashMap::new()));
     println!("State (NodeRegistry) initialized.");
+
+    let registry_clone_for_health_check = node_registry.clone();
+    tokio::spawn(async move {
+        periodic_health_check(
+            registry_clone_for_health_check,
+            settings.node_health.check_interval_seconds,
+            settings.node_health.staleness_seconds,
+        )
+        .await;
+    });
+    println!("[HealthCheck] Background task started.");
 
     let api_nodes_router = api_nodes::create_router(node_registry.clone());
 

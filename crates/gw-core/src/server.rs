@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::node::NodeHealthConfig;
+
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub port: u16,
@@ -9,6 +11,7 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize)]
 pub struct ServerSettings {
     pub server: ServerConfig,
+    pub node_health: NodeHealthConfig,
 }
 
 impl ServerSettings {
