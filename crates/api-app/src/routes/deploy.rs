@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 
-use gw_core::node::NodeRegistry;
+use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
 
 #[derive(Deserialize, Debug)]
 pub struct AppDeployPayload {
@@ -14,6 +14,8 @@ pub async fn post(
 ) -> impl IntoResponse {
     (
         StatusCode::OK,
-        Json(format!("App {} deployment started", payload.name)),
+        Json(SimpleJsonResponse {
+            message: format!("Deploy request for app {} received", payload.name),
+        }),
     )
 }

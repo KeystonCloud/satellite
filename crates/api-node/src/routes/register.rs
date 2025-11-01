@@ -2,7 +2,10 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use serde::Deserialize;
 
-use gw_core::node::{NodeInfo, NodeRegistry};
+use gw_core::{
+    json::SimpleJsonResponse,
+    node::{NodeInfo, NodeRegistry},
+};
 
 #[derive(Deserialize, Debug)]
 pub struct RegisterPayload {
@@ -25,5 +28,10 @@ pub async fn post(
     };
     registry.insert(payload.id.clone(), info);
 
-    (StatusCode::OK, "Node registered")
+    (
+        StatusCode::OK,
+        Json(SimpleJsonResponse {
+            message: format!("Node {} registered successfully", payload.id),
+        }),
+    )
 }

@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 
-use gw_core::node::NodeRegistry;
+use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
 
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {
@@ -19,14 +19,24 @@ pub async fn post(
         Some(node) => {
             node.last_seen = payload.date;
             println!("[API-Nodes] Heartbeat received: id={}", payload.id);
-            (StatusCode::OK, "Heartbeat received")
+            (
+                StatusCode::OK,
+                Json(SimpleJsonResponse {
+                    message: format!("Heartbeat from node {} received", payload.id),
+                }),
+            )
         }
         None => {
             println!(
                 "[API-Nodes] Heartbeat of an unknown node: id={}",
                 payload.id
             );
-            (StatusCode::NOT_FOUND, "Unknown node")
+            (
+                StatusCode::NOT_FOUND,
+                Json(SimpleJsonResponse {
+                    message: format!("Node {} not found", payload.id),
+                }),
+            )
         }
     }
 }
