@@ -1,4 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use chrono::Utc;
 use serde::Deserialize;
 
 use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
@@ -6,7 +7,6 @@ use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {
     id: String,
-    date: i64,
 }
 
 pub async fn post(
@@ -17,7 +17,7 @@ pub async fn post(
 
     match registry.get_mut(&payload.id) {
         Some(node) => {
-            node.last_seen = payload.date;
+            node.last_seen = Utc::now().timestamp();
             println!("[API-Nodes] Heartbeat received: id={}", payload.id);
             (
                 StatusCode::OK,
