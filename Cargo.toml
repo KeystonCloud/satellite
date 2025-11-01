@@ -4,4 +4,5 @@ members = [
     "gateway",
     "crates/gw-core",
     "crates/api-nodes",
+    "crates/api-app",
 ]

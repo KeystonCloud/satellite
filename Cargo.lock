@@ -12,6 +12,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "api-app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "gw-core",
+ "serde",
+]
+
+[[package]]
 name = "api-nodes"
 version = "0.1.0"
 dependencies = [
@@ -350,6 +360,7 @@ dependencies = [
 name = "gateway"
 version = "0.1.0"
 dependencies = [
+ "api-app",
  "api-nodes",
  "axum",
  "gw-core",
