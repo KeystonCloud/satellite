@@ -1,6 +1,7 @@
 use chrono::Duration as ChronoDuration;
-use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use chrono::TimeZone;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -11,11 +12,11 @@ pub struct NodeHealthConfig {
     pub check_interval_seconds: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct NodeInfo {
     pub ip: String,
     pub port: u16,
-    pub last_seen: DateTime<Utc>,
+    pub last_seen: i64,
 }
 
 pub type NodeRegistry = Arc<Mutex<HashMap<String, NodeInfo>>>;
@@ -40,7 +41,8 @@ pub async fn periodic_health_check(
             let mut registry_lock = registry.lock().unwrap();
 
             registry_lock.retain(|node_id, node_info| {
-                let time_since_last_seen = now.signed_duration_since(node_info.last_seen);
+                let time_since_last_seen =
+                    now.signed_duration_since(Utc.timestamp_opt(node_info.last_seen, 0).unwrap());
 
                 if time_since_last_seen > staleness_threshold {
                     println!(

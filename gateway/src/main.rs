@@ -8,19 +8,14 @@ use gw_core::{node::NodeRegistry, node::periodic_health_check, server::ServerSet
 #[tokio::main]
 async fn main() {
     let settings = ServerSettings::new().expect("Failed to load configuration");
-    let server_port = settings.server.port;
-    let server_host = settings.server.host;
-
-    println!(
-        "Configuration loaded. Server on {}:{}",
-        server_host, server_port
-    );
+    println!("Configuration loaded.");
 
     let node_registry: NodeRegistry = Arc::new(Mutex::new(HashMap::new()));
     println!("State (NodeRegistry) initialized.");
 
     let registry_clone_for_health_check = node_registry.clone();
     tokio::spawn(async move {
+        println!("[HealthCheck] Background task started.");
         periodic_health_check(
             registry_clone_for_health_check,
             settings.node_health.check_interval_seconds,
@@ -28,15 +23,13 @@ async fn main() {
         )
         .await;
     });
-    println!("[HealthCheck] Background task started.");
 
     let api_nodes_router = api_nodes::create_router(node_registry.clone());
-
     let app = Router::new()
         .route("/", get(root_handler))
-        .nest("/api/nodes", api_nodes_router);
+        .nest("/api/node", api_nodes_router);
 
-    let addr: SocketAddr = format!("{}:{}", server_host, server_port)
+    let addr: SocketAddr = format!("{}:{}", settings.server.host, settings.server.port)
         .parse()
         .expect("Invalid address format");
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

@@ -11,7 +11,7 @@ pub struct RegisterPayload {
     port: u16,
 }
 
-pub async fn register_node(
+pub async fn post(
     State(registry): State<NodeRegistry>,
     Json(payload): Json<RegisterPayload>,
 ) -> impl IntoResponse {
@@ -21,7 +21,7 @@ pub async fn register_node(
     let info = NodeInfo {
         ip: payload.ip,
         port: payload.port,
-        last_seen: Utc::now(),
+        last_seen: Utc::now().timestamp(),
     };
     registry.insert(payload.id.clone(), info);
 
