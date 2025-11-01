@@ -3,6 +3,6 @@ resolver = "3"
 members = [
     "gateway",
     "crates/gw-core",
-    "crates/api-nodes",
+    "crates/api-node",
     "crates/api-app",
 ]

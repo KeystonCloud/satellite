@@ -24,11 +24,11 @@ async fn main() {
         .await;
     });
 
-    let api_nodes_router = api_nodes::create_router(node_registry.clone());
+    let api_node_router = api_node::create_router(node_registry.clone());
     let api_app_router = api_app::create_router(node_registry.clone());
     let app = Router::new()
         .route("/", get(root_handler))
-        .nest("/api/node", api_nodes_router)
+        .nest("/api/node", api_node_router)
         .nest("/api/app", api_app_router);
 
     let addr: SocketAddr = format!("{}:{}", settings.server.host, settings.server.port)

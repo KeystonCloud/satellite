@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "api-nodes"
+name = "api-node"
 version = "0.1.0"
 dependencies = [
  "axum",
@@ -361,7 +361,7 @@ name = "gateway"
 version = "0.1.0"
 dependencies = [
  "api-app",
- "api-nodes",
+ "api-node",
  "axum",
  "gw-core",
  "tokio",
