@@ -1,11 +1,27 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
-use reqwest::Client;
+use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppDeployPayload {
+    name: String,
+    content: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct NodeDeployPayload {
+    name: String,
+    cid: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct IPFSAddResponse {
+    #[serde(rename = "Hash")]
+    hash: String, // Le CID
+    #[serde(rename = "Name")]
     name: String,
 }
 
@@ -13,6 +29,31 @@ pub async fn post(
     State(registry): State<NodeRegistry>,
     Json(payload): Json<AppDeployPayload>,
 ) -> impl IntoResponse {
+    let tmp_path = "/tmp/keystone_deploy.tmp";
+    if let Err(e) = fs::write(tmp_path, payload.content).await {
+        eprintln!("[API-App] Error in file creation: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(SimpleJsonResponse {
+                message: "Error in file creation".to_string(),
+            }),
+        );
+    }
+
+    let cid = match add_to_ipfs(tmp_path).await {
+        Ok(cid) => cid,
+        Err(e) => {
+            eprintln!("[API-App] Add to IPFS failed: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: e.to_string(),
+                }),
+            );
+        }
+    };
+    println!("[API-App] File added to IPFS. CID: {}", cid);
+
     let client = Client::new();
     let nodes_to_deploy = registry.lock().unwrap().clone(); // TODO: filter nodes based on criteria (geo, capacity, reputation...)
 
@@ -20,12 +61,15 @@ pub async fn post(
     for (id, node) in nodes_to_deploy {
         let client_clone = client.clone();
         let deploy_url = format!("http://{}:{}/api/deploy", node.ip, node.port);
-        let payload_clone = payload.clone();
+        let node_payload = NodeDeployPayload {
+            name: payload.name.clone(),
+            cid: cid.clone(),
+        };
 
         tokio::spawn(async move {
             let res = client_clone
                 .post(&deploy_url)
-                .json(&payload_clone)
+                .json(&node_payload)
                 .send()
                 .await;
 
@@ -54,7 +98,32 @@ pub async fn post(
     (
         StatusCode::OK,
         Json(SimpleJsonResponse {
-            message: format!("Deploy request for app {} received", payload.name),
+            message: format!(
+                "App \"{}\" deployment initiated with CID: {}",
+                payload.name, cid
+            ),
         }),
     )
+}
+
+async fn add_to_ipfs(file_path: &str) -> Result<String, String> {
+    let file = fs::read(file_path).await.map_err(|e| e.to_string())?;
+    let part = multipart::Part::bytes(file).file_name("deploy.tmp");
+    let form = multipart::Form::new().part("file", part);
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("http://localhost:5001/api/v0/add")
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        return Err(format!("[API-App] IPFS error {}", resp.status()));
+    }
+
+    let kubo_resp: IPFSAddResponse = resp.json().await.map_err(|e| e.to_string())?;
+
+    Ok(kubo_resp.hash)
 }
