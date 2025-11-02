@@ -11,16 +11,6 @@ async fn main() {
 
     let node_registry: NodeRegistry = Arc::new(Mutex::new(HashMap::new()));
 
-    let registry_clone_for_health_check = node_registry.clone();
-    tokio::spawn(async move {
-        periodic_health_check(
-            registry_clone_for_health_check,
-            settings.node_health.check_interval_seconds,
-            settings.node_health.staleness_seconds,
-        )
-        .await;
-    });
-
     let api_node_router = api_node::create_router(node_registry.clone());
     let api_app_router = api_app::create_router(node_registry.clone());
     let app = Router::new()
@@ -35,7 +25,18 @@ async fn main() {
 
     println!("---- Satellite started ----");
     println!("API: {}", addr);
+    println!("Gateway PEER ID: {}", settings.server.peer_id);
     println!("----------------------");
+
+    let registry_clone_for_health_check = node_registry.clone();
+    tokio::spawn(async move {
+        periodic_health_check(
+            registry_clone_for_health_check,
+            settings.node_health.check_interval_seconds,
+            settings.node_health.staleness_seconds,
+        )
+        .await;
+    });
 
     axum::serve(
         listener,

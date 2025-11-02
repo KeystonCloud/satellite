@@ -6,6 +6,7 @@ use crate::node::NodeHealthConfig;
 pub struct ServerConfig {
     pub port: u16,
     pub host: String,
+    pub peer_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -18,7 +19,7 @@ impl ServerSettings {
     pub fn new() -> Result<Self, config::ConfigError> {
         let config_builder = config::Config::builder()
             .add_source(config::File::with_name("config/default"))
-            .add_source(config::Environment::with_prefix("GW").separator("__"))
+            .add_source(config::Environment::with_prefix("KC").separator("__"))
             .build()?;
 
         config_builder.try_deserialize()

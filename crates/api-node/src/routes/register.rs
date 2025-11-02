@@ -11,7 +11,6 @@ use gw_core::{
 #[derive(Deserialize, Debug)]
 pub struct RegisterPayload {
     id: String,
-    ip: String,
     port: u16,
 }
 

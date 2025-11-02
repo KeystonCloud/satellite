@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
 RUN wget https://dist.ipfs.tech/kubo/v0.38.2/kubo_v0.38.2_linux-amd64.tar.gz
 RUN tar -xvzf kubo_v0.38.2_linux-amd64.tar.gz
 RUN cd kubo && bash install.sh
-RUN ipfs init
 
 RUN cargo install cargo-watch
 
@@ -17,8 +16,6 @@ COPY . .
 
 RUN cargo build --release
 
-EXPOSE 8000
-EXPOSE 5001
-EXPOSE 4001
+EXPOSE 8000 8080 5001 4001
 
 CMD ["sh", "start.sh"]
