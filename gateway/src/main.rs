@@ -8,14 +8,11 @@ use gw_core::{node::NodeRegistry, node::periodic_health_check, server::ServerSet
 #[tokio::main]
 async fn main() {
     let settings = ServerSettings::new().expect("Failed to load configuration");
-    println!("Configuration loaded.");
 
     let node_registry: NodeRegistry = Arc::new(Mutex::new(HashMap::new()));
-    println!("State (NodeRegistry) initialized.");
 
     let registry_clone_for_health_check = node_registry.clone();
     tokio::spawn(async move {
-        println!("[HealthCheck] Background task started.");
         periodic_health_check(
             registry_clone_for_health_check,
             settings.node_health.check_interval_seconds,
@@ -36,8 +33,16 @@ async fn main() {
         .expect("Invalid address format");
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-    println!("Gateway started on {}", addr);
-    axum::serve(listener, app).await.unwrap();
+    println!("---- Satellite started ----");
+    println!("API: {}", addr);
+    println!("----------------------");
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
 
 async fn root_handler() -> &'static str {

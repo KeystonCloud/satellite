@@ -1,6 +1,7 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::ConnectInfo, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use serde::Deserialize;
+use std::net::SocketAddr;
 
 use gw_core::{
     json::SimpleJsonResponse,
@@ -15,6 +16,7 @@ pub struct RegisterPayload {
 }
 
 pub async fn post(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(registry): State<NodeRegistry>,
     Json(payload): Json<RegisterPayload>,
 ) -> impl IntoResponse {
@@ -22,7 +24,7 @@ pub async fn post(
     let mut registry = registry.lock().unwrap();
 
     let info = NodeInfo {
-        ip: payload.ip,
+        ip: addr.ip().to_string(),
         port: payload.port,
         last_seen: Utc::now().timestamp(),
     };

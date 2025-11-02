@@ -8,3 +8,5 @@ axum = "0.8.6"
 chrono = "0.4.42"
 serde = { version = "1.0.228", features = ["derive"] }
 gw-core = { path = "../gw-core" }
+reqwest = { version = "0.12.24", features = ["json"] }
+tokio = { version = "1.48.0", features = ["full"] }
