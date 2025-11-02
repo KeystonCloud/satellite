@@ -1,22 +1,28 @@
 use axum::{Router, routing::get};
+use gw_core::server::ServerState;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use gw_core::{node::NodeRegistry, node::periodic_health_check, server::ServerSettings};
+use gw_core::{node::periodic_health_check, server::ServerSettings};
 
 #[tokio::main]
 async fn main() {
     let settings = ServerSettings::new().expect("Failed to load configuration");
 
-    let node_registry: NodeRegistry = Arc::new(Mutex::new(HashMap::new()));
+    let server_state: ServerState = ServerState {
+        node_registry: Arc::new(Mutex::new(HashMap::new())),
+        app_registry: Arc::new(Mutex::new(HashMap::new())),
+    };
 
-    let api_node_router = api_node::create_router(node_registry.clone());
-    let api_app_router = api_app::create_router(node_registry.clone());
+    let api_node_router = api_node::create_router(server_state.node_registry.clone());
+    let api_app_router = api_app::create_router(server_state.clone());
+    let web_server_router = web_server::create_router(server_state.clone());
     let app = Router::new()
         .route("/", get(root_handler))
         .nest("/api/node", api_node_router)
-        .nest("/api/app", api_app_router);
+        .nest("/api/app", api_app_router)
+        .merge(web_server_router);
 
     let addr: SocketAddr = format!("{}:{}", settings.server.host, settings.server.port)
         .parse()
@@ -28,7 +34,7 @@ async fn main() {
     println!("Gateway PEER ID: {}", settings.server.peer_id);
     println!("----------------------");
 
-    let registry_clone_for_health_check = node_registry.clone();
+    let registry_clone_for_health_check = server_state.node_registry.clone();
     tokio::spawn(async move {
         periodic_health_check(
             registry_clone_for_health_check,

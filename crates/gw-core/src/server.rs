@@ -1,6 +1,15 @@
 use serde::Deserialize;
 
-use crate::node::NodeHealthConfig;
+use crate::{
+    app::AppRegistry,
+    node::{NodeHealthConfig, NodeRegistry},
+};
+
+#[derive(Clone)]
+pub struct ServerState {
+    pub node_registry: NodeRegistry,
+    pub app_registry: AppRegistry,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {

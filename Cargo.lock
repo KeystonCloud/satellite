@@ -437,6 +437,7 @@ dependencies = [
  "axum",
  "gw-core",
  "tokio",
+ "web-server",
 ]
 
 [[package]]
@@ -1868,6 +1869,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bad67dc8b2a1a6e5448428adec4c3e84c43e561d8c9ee8a9e5aabeb193ec41d1"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "web-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "gw-core",
+ "reqwest",
 ]
 
 [[package]]

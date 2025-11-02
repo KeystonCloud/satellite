@@ -3,7 +3,7 @@ use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
+use gw_core::{app::AppInfo, json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppDeployPayload {
@@ -20,13 +20,11 @@ pub struct NodeDeployPayload {
 #[derive(Deserialize, Debug)]
 struct IPFSAddResponse {
     #[serde(rename = "Hash")]
-    hash: String, // Le CID
-    #[serde(rename = "Name")]
-    name: String,
+    hash: String,
 }
 
 pub async fn post(
-    State(registry): State<NodeRegistry>,
+    State(state): State<ServerState>,
     Json(payload): Json<AppDeployPayload>,
 ) -> impl IntoResponse {
     let tmp_path = "/tmp/keystone_deploy.tmp";
@@ -54,8 +52,18 @@ pub async fn post(
     };
     println!("[API-App] File added to IPFS. CID: {}", cid);
 
+    let app_info = AppInfo {
+        name: payload.name.clone(),
+        current_cid: cid.clone(),
+    };
+    state
+        .app_registry
+        .lock()
+        .unwrap()
+        .insert(payload.name.clone(), app_info);
+
     let client = Client::new();
-    let nodes_to_deploy = registry.lock().unwrap().clone(); // TODO: filter nodes based on criteria (geo, capacity, reputation...)
+    let nodes_to_deploy = state.node_registry.lock().unwrap().clone(); // TODO: filter nodes based on criteria (geo, capacity, reputation...)
 
     // EXAMPLE : send deployment on all nodes
     for (id, node) in nodes_to_deploy {

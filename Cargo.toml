@@ -5,4 +5,5 @@ members = [
     "crates/gw-core",
     "crates/api-node",
     "crates/api-app",
+    "crates/web-server",
 ]
