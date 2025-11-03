@@ -5,6 +5,6 @@ pub mod routes;
 
 pub fn create_router(state: ServerState) -> Router {
     Router::new()
-        .route("/{app_name}", get(routes::gateway::web_handler))
+        .route("/app/{app_name}", get(routes::gateway::web_handler))
         .with_state(state)
 }
