@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use gw_core::server::ServerState;
+use core::server::ServerState;
 use reqwest::Client;
 
 pub fn create_router(state: ServerState) -> Router {

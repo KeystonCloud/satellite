@@ -7,4 +7,4 @@ edition = "2024"
 axum = "0.8.6"
 chrono = "0.4.42"
 serde = { version = "1.0.228", features = ["derive"] }
-gw-core = { path = "../gw-core" }
+core = { path = "../core" }

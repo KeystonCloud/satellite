@@ -1,6 +1,6 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 
-use gw_core::node::NodeRegistry;
+use core::node::NodeRegistry;
 
 pub async fn get(State(registry): State<NodeRegistry>) -> impl IntoResponse {
     (

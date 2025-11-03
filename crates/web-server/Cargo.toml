@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 axum = "0.8.6"
 reqwest = { version = "0.12.24", features = ["json", "multipart"] }
-gw-core = { path = "../gw-core" }
+core = { path = "../core" }

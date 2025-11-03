@@ -17,7 +17,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
- "gw-core",
+ "core",
  "reqwest",
  "serde",
  "tokio",
@@ -29,7 +29,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
- "gw-core",
+ "core",
  "serde",
 ]
 
@@ -235,6 +235,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "config",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -435,7 +445,7 @@ dependencies = [
  "api-app",
  "api-node",
  "axum",
- "gw-core",
+ "core",
  "tokio",
  "web-server",
 ]
@@ -471,16 +481,6 @@ dependencies = [
  "libc",
  "r-efi",
  "wasip2",
-]
-
-[[package]]
-name = "gw-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "config",
- "serde",
- "tokio",
 ]
 
 [[package]]
@@ -1876,7 +1876,7 @@ name = "web-server"
 version = "0.1.0"
 dependencies = [
  "axum",
- "gw-core",
+ "core",
  "reqwest",
 ]
 

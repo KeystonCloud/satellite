@@ -3,7 +3,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use std::net::SocketAddr;
 
-use gw_core::{
+use core::{
     json::SimpleJsonResponse,
     node::{NodeInfo, NodeRegistry},
 };

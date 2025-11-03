@@ -1,10 +1,8 @@
 use axum::{Router, routing::get};
-use gw_core::server::ServerState;
+use core::{node::periodic_health_check, server::ServerSettings, server::ServerState};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-
-use gw_core::{node::periodic_health_check, server::ServerSettings};
 
 #[tokio::main]
 async fn main() {

@@ -1,6 +1,6 @@
 use axum::{Router, routing::post};
 
-use gw_core::server::ServerState;
+use core::server::ServerState;
 
 pub mod routes;
 

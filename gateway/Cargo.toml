@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-gw-core = { path = "../crates/gw-core" }
+core = { path = "../crates/core" }
 api-node = { path = "../crates/api-node" }
 api-app = { path = "../crates/api-app" }
 web-server = { path = "../crates/web-server" }

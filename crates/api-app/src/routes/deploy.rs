@@ -3,7 +3,7 @@ use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use gw_core::{app::AppInfo, json::SimpleJsonResponse, server::ServerState};
+use core::{app::AppInfo, json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppDeployPayload {

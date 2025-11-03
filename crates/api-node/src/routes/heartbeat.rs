@@ -2,7 +2,7 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use serde::Deserialize;
 
-use gw_core::{json::SimpleJsonResponse, node::NodeRegistry};
+use core::{json::SimpleJsonResponse, node::NodeRegistry};
 
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {

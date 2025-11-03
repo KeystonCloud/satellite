@@ -1,6 +1,6 @@
 use axum::{Router, routing::get, routing::post};
 
-use gw_core::node::NodeRegistry;
+use core::node::NodeRegistry;
 
 pub mod routes;
 
