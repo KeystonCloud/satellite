@@ -90,28 +90,23 @@ pub async fn post(
         };
     println!("[API-App] IPNS key: {}", key_info.id);
 
-    let ipns_result = match publish_to_ipns(
-        &state.server_settings.server.ipfs_host,
-        &key_info.name,
-        &cid,
-    )
-    .await
-    {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("[API-App] IPNS publication failed: {}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(SimpleJsonResponse {
-                    message: e.to_string(),
-                }),
-            );
-        }
-    };
-    println!(
-        "[API-App] App \"{}\" published on IPNS ({} -> {})",
-        payload.name, ipns_result.name, ipns_result.value
-    );
+    let app_name_clone = payload.name.clone();
+    let ipfs_host_clone = state.server_settings.server.ipfs_host.clone();
+    let key_name_clone = key_info.name.clone();
+    let cid_clone = cid.clone();
+    tokio::spawn(async move {
+        match publish_to_ipns(&ipfs_host_clone, &key_name_clone, &cid_clone).await {
+            Ok(ipns_result) => {
+                println!(
+                    "[API-App] App \"{}\" published on IPNS ({} -> {})",
+                    app_name_clone, ipns_result.name, ipns_result.value
+                );
+            }
+            Err(e) => {
+                eprintln!("[API-App] IPNS publication failed: {}", e);
+            }
+        };
+    });
 
     if let Err(e) = update_or_create_app_info(&state, &payload.name, &cid, &key_info) {
         eprintln!("[API-App] Create / Update app info failed: {}", e);
