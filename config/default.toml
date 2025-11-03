@@ -1,6 +1,7 @@
 [server]
 port = 8000
 host = "0.0.0.0"
+ipfs_host = "http://localhost:5001"
 
 [node_health]
 staleness_seconds = 90

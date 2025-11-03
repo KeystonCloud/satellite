@@ -60,7 +60,7 @@ pub async fn post(
         );
     }
 
-    let cid = match add_to_ipfs(tmp_path).await {
+    let cid = match add_to_ipfs(&state.server_settings.server.ipfs_host, tmp_path).await {
         Ok(cid) => cid,
         Err(e) => {
             eprintln!("[API-App] Add to IPFS failed: {}", e);
@@ -74,21 +74,29 @@ pub async fn post(
     };
     println!("[API-App] File added to IPFS. CID: {}", cid);
 
-    let key_info = match find_or_create_ipns_key(&payload.name).await {
-        Ok(info) => info,
-        Err(e) => {
-            eprintln!("[API-App] IPNS management failed: {}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(SimpleJsonResponse {
-                    message: e.to_string(),
-                }),
-            );
-        }
-    };
+    let key_info =
+        match find_or_create_ipns_key(&state.server_settings.server.ipfs_host, &payload.name).await
+        {
+            Ok(info) => info,
+            Err(e) => {
+                eprintln!("[API-App] IPNS management failed: {}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(SimpleJsonResponse {
+                        message: e.to_string(),
+                    }),
+                );
+            }
+        };
     println!("[API-App] IPNS key: {}", key_info.id);
 
-    let ipns_result = match publish_to_ipns(&key_info.name, &cid).await {
+    let ipns_result = match publish_to_ipns(
+        &state.server_settings.server.ipfs_host,
+        &key_info.name,
+        &cid,
+    )
+    .await
+    {
         Ok(res) => res,
         Err(e) => {
             eprintln!("[API-App] IPNS publication failed: {}", e);
@@ -198,9 +206,9 @@ fn update_or_create_app_info(
     Ok(())
 }
 
-async fn find_or_create_ipns_key(app_name: &str) -> Result<KeyInfo, String> {
+async fn find_or_create_ipns_key(ipfs_host: &str, app_name: &str) -> Result<KeyInfo, String> {
     let client = Client::new();
-    let key_url = "http://localhost:5001/api/v0/key/list";
+    let key_url = format!("{}/api/v0/key/list", ipfs_host);
 
     let resp = client
         .post(key_url)
@@ -218,10 +226,7 @@ async fn find_or_create_ipns_key(app_name: &str) -> Result<KeyInfo, String> {
     }
 
     println!("[IPNS] Key not found, creation for \"{}\"", app_name);
-    let create_url = format!(
-        "http://localhost:5001/api/v0/key/gen?arg={}&type=ed25519",
-        app_name
-    );
+    let create_url = format!("{}/api/v0/key/gen?arg={}&type=ed25519", ipfs_host, app_name);
     let create_resp = client
         .post(create_url)
         .send()
@@ -235,12 +240,16 @@ async fn find_or_create_ipns_key(app_name: &str) -> Result<KeyInfo, String> {
     Ok(key_info)
 }
 
-async fn publish_to_ipns(key_name: &str, cid: &str) -> Result<IpnsPublishResponse, String> {
+async fn publish_to_ipns(
+    ipfs_host: &str,
+    key_name: &str,
+    cid: &str,
+) -> Result<IpnsPublishResponse, String> {
     let client = Client::new();
     let ipfs_path = format!("/ipfs/{}", cid);
     let publish_url = format!(
-        "http://localhost:5001/api/v0/name/publish?key={}&arg={}",
-        key_name, ipfs_path
+        "{}/api/v0/name/publish?key={}&arg={}",
+        ipfs_host, key_name, ipfs_path
     );
 
     let resp = client
@@ -258,14 +267,14 @@ async fn publish_to_ipns(key_name: &str, cid: &str) -> Result<IpnsPublishRespons
     Ok(publish_info)
 }
 
-async fn add_to_ipfs(file_path: &str) -> Result<String, String> {
+async fn add_to_ipfs(ipfs_host: &str, file_path: &str) -> Result<String, String> {
     let file = fs::read(file_path).await.map_err(|e| e.to_string())?;
     let part = multipart::Part::bytes(file).file_name("deploy.tmp");
     let form = multipart::Form::new().part("file", part);
 
     let client = reqwest::Client::new();
     let resp = client
-        .post("http://localhost:5001/api/v0/add")
+        .post(format!("{}/api/v0/add", ipfs_host))
         .multipart(form)
         .send()
         .await

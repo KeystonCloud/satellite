@@ -11,6 +11,7 @@ async fn main() {
     let settings = ServerSettings::new().expect("Failed to load configuration");
 
     let server_state: ServerState = ServerState {
+        server_settings: settings.clone(),
         node_registry: Arc::new(Mutex::new(HashMap::new())),
         app_registry: Arc::new(Mutex::new(HashMap::new())),
     };

@@ -31,7 +31,10 @@ pub async fn web_handler(
 
     println!("[WEB] App \"{}\" found. CID: {}", app_name, cid);
 
-    let ipfs_url = format!("http://localhost:5001/api/v0/cat?arg={}", cid);
+    let ipfs_url = format!(
+        "{}/api/v0/cat?arg={}",
+        state.server_settings.server.ipfs_host, cid
+    );
     let client = Client::new();
 
     let res = match client.post(&ipfs_url).send().await {

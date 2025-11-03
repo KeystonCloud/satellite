@@ -7,18 +7,20 @@ use crate::{
 
 #[derive(Clone)]
 pub struct ServerState {
+    pub server_settings: ServerSettings,
     pub node_registry: NodeRegistry,
     pub app_registry: AppRegistry,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub port: u16,
     pub host: String,
     pub peer_id: String,
+    pub ipfs_host: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerSettings {
     pub server: ServerConfig,
     pub node_health: NodeHealthConfig,
