@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 pub struct AppInfo {
     pub name: String,
     pub current_cid: String,
+    pub key_name: String,
+    pub ipns_name: String,
 }
 
 pub type AppRegistry = Arc<Mutex<HashMap<String, AppInfo>>>;

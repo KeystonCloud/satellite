@@ -23,6 +23,28 @@ struct IPFSAddResponse {
     hash: String,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+struct KeyInfo {
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Id")]
+    id: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct KeyListResponse {
+    #[serde(rename = "Keys")]
+    keys: Vec<KeyInfo>,
+}
+
+#[derive(Deserialize, Debug)]
+struct IpnsPublishResponse {
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Value")]
+    value: String,
+}
+
 pub async fn post(
     State(state): State<ServerState>,
     Json(payload): Json<AppDeployPayload>,
@@ -52,15 +74,46 @@ pub async fn post(
     };
     println!("[API-App] File added to IPFS. CID: {}", cid);
 
-    let app_info = AppInfo {
-        name: payload.name.clone(),
-        current_cid: cid.clone(),
+    let key_info = match find_or_create_ipns_key(&payload.name).await {
+        Ok(info) => info,
+        Err(e) => {
+            eprintln!("[API-App] IPNS management failed: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: e.to_string(),
+                }),
+            );
+        }
     };
-    state
-        .app_registry
-        .lock()
-        .unwrap()
-        .insert(payload.name.clone(), app_info);
+    println!("[API-App] IPNS key: {}", key_info.id);
+
+    let ipns_result = match publish_to_ipns(&key_info.name, &cid).await {
+        Ok(res) => res,
+        Err(e) => {
+            eprintln!("[API-App] IPNS publication failed: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: e.to_string(),
+                }),
+            );
+        }
+    };
+    println!(
+        "[API-App] App \"{}\" published on IPNS ({} -> {})",
+        payload.name, ipns_result.name, ipns_result.value
+    );
+
+    if let Err(e) = update_or_create_app_info(&state, &payload.name, &cid, &key_info) {
+        eprintln!("[API-App] Create / Update app info failed: {}", e);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(SimpleJsonResponse {
+                message: e.to_string(),
+            }),
+        );
+    }
 
     let client = Client::new();
     let nodes_to_deploy = state.node_registry.lock().unwrap().clone(); // TODO: filter nodes based on criteria (geo, capacity, reputation...)
@@ -112,6 +165,97 @@ pub async fn post(
             ),
         }),
     )
+}
+
+fn update_or_create_app_info(
+    state: &ServerState,
+    name: &str,
+    cid: &str,
+    key_info: &KeyInfo,
+) -> Result<(), String> {
+    let mut app_registry = state.app_registry.lock().unwrap();
+
+    match app_registry.get_mut(name) {
+        Some(app) => {
+            app.current_cid = cid.to_string();
+            app.key_name = key_info.name.clone();
+            app.ipns_name = key_info.id.clone();
+            println!("[API-App] Updated app info for \"{}\"", name);
+        }
+        None => {
+            app_registry.insert(
+                name.to_string(),
+                AppInfo {
+                    name: name.to_string(),
+                    current_cid: cid.to_string(),
+                    key_name: key_info.name.clone(),
+                    ipns_name: key_info.id.clone(),
+                },
+            );
+            println!("[API-App] Created new app info for \"{}\"", name);
+        }
+    }
+    Ok(())
+}
+
+async fn find_or_create_ipns_key(app_name: &str) -> Result<KeyInfo, String> {
+    let client = Client::new();
+    let key_url = "http://localhost:5001/api/v0/key/list";
+
+    let resp = client
+        .post(key_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("[IPNS] Key list error: {}", resp.status()));
+    }
+    let key_list: KeyListResponse = resp.json().await.map_err(|e| e.to_string())?;
+
+    if let Some(key) = key_list.keys.into_iter().find(|k| k.name == app_name) {
+        println!("[IPNS] Key found for \"{}\"", app_name);
+        return Ok(key);
+    }
+
+    println!("[IPNS] Key not found, creation for \"{}\"", app_name);
+    let create_url = format!(
+        "http://localhost:5001/api/v0/key/gen?arg={}&type=ed25519",
+        app_name
+    );
+    let create_resp = client
+        .post(create_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !create_resp.status().is_success() {
+        return Err(format!("[IPNS] Key gen error: {}", create_resp.status()));
+    }
+
+    let key_info: KeyInfo = create_resp.json().await.map_err(|e| e.to_string())?;
+    Ok(key_info)
+}
+
+async fn publish_to_ipns(key_name: &str, cid: &str) -> Result<IpnsPublishResponse, String> {
+    let client = Client::new();
+    let ipfs_path = format!("/ipfs/{}", cid);
+    let publish_url = format!(
+        "http://localhost:5001/api/v0/name/publish?key={}&arg={}",
+        key_name, ipfs_path
+    );
+
+    let resp = client
+        .post(publish_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        let error_text = resp.text().await.unwrap_or_default();
+        return Err(format!("[IPNS] Publishing failed: {}", error_text));
+    }
+
+    let publish_info: IpnsPublishResponse = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(publish_info)
 }
 
 async fn add_to_ipfs(file_path: &str) -> Result<String, String> {
