@@ -25,11 +25,13 @@ async fn main() {
         db_pool: db_pool,
     };
 
+    let api_user_router = api_user::create_router(server_state.clone());
     let api_node_router = api_node::create_router(server_state.clone());
     let api_app_router = api_app::create_router(server_state.clone());
     let web_server_router = web_server::create_router(server_state.clone());
     let app = Router::new()
         .route("/", get(root_handler))
+        .nest("/api/user", api_user_router)
         .nest("/api/node", api_node_router)
         .nest("/api/app", api_app_router)
         .merge(web_server_router);
