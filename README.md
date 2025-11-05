@@ -45,7 +45,6 @@ If you want to use docker compose for development, you can add into ``services``
       - 8000:8000
     depends_on:
       - postgres
-      - redis
     deploy:
       replicas: 1
 ```
