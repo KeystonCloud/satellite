@@ -1,5 +1,8 @@
 use axum::{Router, routing::get};
-use core::{node::periodic_health_check, server::ServerSettings, server::ServerState};
+use core::{
+    database::create_db_pool, node::periodic_health_check, server::ServerSettings,
+    server::ServerState,
+};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -8,13 +11,21 @@ use std::sync::{Arc, Mutex};
 async fn main() {
     let settings = ServerSettings::new().expect("Failed to load configuration");
 
+    let db_pool = match create_db_pool(&settings.database).await {
+        Ok(pool) => pool,
+        Err(e) => {
+            panic!("Failed to create database pool: {}", e.message);
+        }
+    };
+
     let server_state: ServerState = ServerState {
         server_settings: settings.clone(),
         node_registry: Arc::new(Mutex::new(HashMap::new())),
         app_registry: Arc::new(Mutex::new(HashMap::new())),
+        db_pool: db_pool,
     };
 
-    let api_node_router = api_node::create_router(server_state.node_registry.clone());
+    let api_node_router = api_node::create_router(server_state.clone());
     let api_app_router = api_app::create_router(server_state.clone());
     let web_server_router = web_server::create_router(server_state.clone());
     let app = Router::new()

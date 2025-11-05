@@ -1,12 +1,13 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 
-use core::node::NodeRegistry;
+use core::server::ServerState;
 
-pub async fn get(State(registry): State<NodeRegistry>) -> impl IntoResponse {
+pub async fn get(State(state): State<ServerState>) -> impl IntoResponse {
     (
         StatusCode::OK,
         Json(
-            registry
+            state
+                .node_registry
                 .lock()
                 .unwrap()
                 .values()

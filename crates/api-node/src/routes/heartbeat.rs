@@ -2,7 +2,7 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use serde::Deserialize;
 
-use core::{json::SimpleJsonResponse, node::NodeRegistry};
+use core::{json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {
@@ -10,10 +10,10 @@ pub struct HeartbeatPayload {
 }
 
 pub async fn post(
-    State(registry): State<NodeRegistry>,
+    State(state): State<ServerState>,
     Json(payload): Json<HeartbeatPayload>,
 ) -> impl IntoResponse {
-    let mut registry = registry.lock().unwrap();
+    let mut registry = state.node_registry.lock().unwrap();
 
     match registry.get_mut(&payload.id) {
         Some(node) => {

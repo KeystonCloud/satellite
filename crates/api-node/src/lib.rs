@@ -1,10 +1,10 @@
 use axum::{Router, routing::get, routing::post};
 
-use core::node::NodeRegistry;
+use core::server::ServerState;
 
 pub mod routes;
 
-pub fn create_router(state: NodeRegistry) -> Router {
+pub fn create_router(state: ServerState) -> Router {
     Router::new()
         .route("/list", get(routes::list::get))
         .route("/register", post(routes::register::post))

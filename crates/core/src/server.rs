@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     app::AppRegistry,
+    database::{DatabaseConfig, DbPool},
     node::{NodeHealthConfig, NodeRegistry},
 };
 
@@ -10,6 +11,7 @@ pub struct ServerState {
     pub server_settings: ServerSettings,
     pub node_registry: NodeRegistry,
     pub app_registry: AppRegistry,
+    pub db_pool: DbPool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -24,6 +26,7 @@ pub struct ServerConfig {
 pub struct ServerSettings {
     pub server: ServerConfig,
     pub node_health: NodeHealthConfig,
+    pub database: DatabaseConfig,
 }
 
 impl ServerSettings {

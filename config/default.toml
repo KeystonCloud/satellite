@@ -6,3 +6,12 @@ ipfs_host = "http://localhost:5001"
 [node_health]
 staleness_seconds = 90
 check_interval_seconds = 60
+
+[database]
+connection = "postgres"
+host = "postgres"
+port = 5432
+username = "keyston"
+password = "keystonpassword"
+database_name = "keyston_db"
+pool_size = 5

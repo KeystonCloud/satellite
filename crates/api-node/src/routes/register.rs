@@ -3,10 +3,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use std::net::SocketAddr;
 
-use core::{
-    json::SimpleJsonResponse,
-    node::{NodeInfo, NodeRegistry},
-};
+use core::{json::SimpleJsonResponse, node::NodeInfo, server::ServerState};
 
 #[derive(Deserialize, Debug)]
 pub struct RegisterPayload {
@@ -16,11 +13,11 @@ pub struct RegisterPayload {
 
 pub async fn post(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(registry): State<NodeRegistry>,
+    State(state): State<ServerState>,
     Json(payload): Json<RegisterPayload>,
 ) -> impl IntoResponse {
     println!("[API-Nodes] Registration received: id={}", payload.id);
-    let mut registry = registry.lock().unwrap();
+    let mut registry = state.node_registry.lock().unwrap();
 
     let info = NodeInfo {
         ip: addr.ip().to_string(),

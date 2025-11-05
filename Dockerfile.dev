@@ -9,6 +9,7 @@ RUN tar -xvzf kubo_v0.38.2_linux-amd64.tar.gz
 RUN cd kubo && bash install.sh
 
 RUN cargo install cargo-watch
+RUN cargo install sqlx-cli --no-default-features --features postgres
 
 WORKDIR /app
 
