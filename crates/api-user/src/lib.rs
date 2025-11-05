@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{delete, get, post, put},
 };
 
 use core::server::ServerState;
@@ -13,5 +13,7 @@ pub fn create_router(state: ServerState) -> Router {
         .route("/", post(routes::user::create))
         .route("/", get(routes::user::get_all))
         .route("/{uuid}", get(routes::user::get))
+        .route("/{uuid}", put(routes::user::update))
+        .route("/{uuid}", delete(routes::user::delete))
         .with_state(state)
 }

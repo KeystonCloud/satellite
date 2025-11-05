@@ -5,7 +5,8 @@ use axum::{
     response::IntoResponse,
 };
 use serde::Deserialize;
-use sqlx::{Row, types::Uuid};
+use sqlx::{Execute, QueryBuilder, Row, types::Uuid};
+use struct_iterable::Iterable;
 
 use crate::models::user::User;
 use core::{
@@ -18,6 +19,13 @@ pub struct CreateUserPayload {
     name: String,
     email: String,
     password: String,
+}
+
+#[derive(Deserialize, Debug, Iterable)]
+pub struct UpdateUserPayload {
+    name: Option<String>,
+    email: Option<String>,
+    password: Option<String>,
 }
 
 pub async fn create(
@@ -90,6 +98,103 @@ pub async fn get(State(state): State<ServerState>, Path(uuid): Path<String>) -> 
                     user.password = None;
                     user
                 }) {
+                Ok(user) => (
+                    StatusCode::OK,
+                    Json(ModelJsonResponse {
+                        data: Some(user),
+                        error: None,
+                    }),
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ModelJsonResponse {
+                        data: None,
+                        error: Some(e.to_string()),
+                    }),
+                ),
+            }
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(ModelJsonResponse {
+                data: None,
+                error: Some(format!("Invalid UUID format: {}", e)),
+            }),
+        ),
+    }
+}
+
+pub async fn update(
+    State(state): State<ServerState>,
+    Path(uuid): Path<String>,
+    Json(payload): Json<UpdateUserPayload>,
+) -> impl IntoResponse {
+    match Uuid::parse_str(&uuid) {
+        Ok(uuid) => {
+            let mut query_builder = QueryBuilder::new("UPDATE users");
+
+            let mut i = 0;
+            for (name, field_value) in payload.iter() {
+                if let Some(value) = field_value.downcast_ref::<Option<String>>() {
+                    if let Some(v) = value {
+                        if i == 0 {
+                            query_builder.push(" SET ");
+                        } else {
+                            query_builder.push(", ");
+                        }
+
+                        query_builder.push(name).push(" = ").push_bind(v);
+                        i += 1;
+                    }
+                }
+            }
+
+            query_builder.push(" WHERE id = ").push_bind(uuid);
+            query_builder.push(" RETURNING *");
+
+            let query = query_builder.build_query_as::<User>();
+
+            match query.fetch_one(&state.db_pool).await.map(|mut user| {
+                user.password = None;
+                user
+            }) {
+                Ok(user) => (
+                    StatusCode::OK,
+                    Json(ModelJsonResponse {
+                        data: Some(user),
+                        error: None,
+                    }),
+                ),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ModelJsonResponse {
+                        data: None,
+                        error: Some(e.to_string()),
+                    }),
+                ),
+            }
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(ModelJsonResponse {
+                data: None,
+                error: Some(format!("Invalid UUID format: {}", e)),
+            }),
+        ),
+    }
+}
+
+pub async fn delete(
+    State(state): State<ServerState>,
+    Path(uuid): Path<String>,
+) -> impl IntoResponse {
+    match Uuid::parse_str(&uuid) {
+        Ok(uuid) => {
+            match sqlx::query_as::<_, User>("DELETE FROM users WHERE id = $1 RETURNING *")
+                .bind(uuid)
+                .fetch_one(&state.db_pool)
+                .await
+            {
                 Ok(user) => (
                     StatusCode::OK,
                     Json(ModelJsonResponse {
