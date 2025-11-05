@@ -14,7 +14,7 @@ keystone-cloud/
 ```
 
 ### Define Compose file
-If you want to use docker compose for development, you can add into ``services`` part all needed services for satellite. This is a seimple example of configuration:
+If you want to use docker compose for development, you can add into ``services`` part all needed services for satellite. This is a simple example of configuration:
 ```yaml
   postgres:
     image: postgres:18
@@ -49,6 +49,12 @@ If you want to use docker compose for development, you can add into ``services``
     deploy:
       replicas: 1
 ```
+
+Add new volume storage for postgres data in ``volumes`` part of your docker compose file:
+```yaml
+  postgres-data:
+```
+
 This stack will create a postgres database, an adminer service and the satellite service. The satellite service will be built using the `Dockerfile.dev` file located in the `satellite` folder and use starting script `start.sh`.
 This starting script will run the application by using `cargo watch` to automatically reload the application when code changes are detected.
 
