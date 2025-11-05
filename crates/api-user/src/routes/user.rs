@@ -5,7 +5,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::Deserialize;
-use sqlx::{Execute, QueryBuilder, Row, types::Uuid};
+use sqlx::{QueryBuilder, Row, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::models::user::User;
