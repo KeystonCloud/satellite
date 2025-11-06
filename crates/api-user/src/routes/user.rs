@@ -4,13 +4,15 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Deserialize;
 use sqlx::{QueryBuilder, Row, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::models::user::User;
 use core::{
-    json::{ModelJsonResponse, SimpleJsonResponse},
+    authentication,
+    json::{DataJsonResponse, SimpleJsonResponse},
     server::ServerState,
 };
 
@@ -19,13 +21,6 @@ pub struct CreateUserPayload {
     name: String,
     email: String,
     password: String,
-}
-
-#[derive(Deserialize, Debug, Iterable)]
-pub struct UpdateUserPayload {
-    name: Option<String>,
-    email: Option<String>,
-    password: Option<String>,
 }
 
 pub async fn create(
@@ -57,7 +52,20 @@ pub async fn create(
     }
 }
 
-pub async fn get_all(State(state): State<ServerState>) -> impl IntoResponse {
+pub async fn get_all(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    if authenticated_claims.role != "admin" {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some("Insufficient permissions to access all users".to_string()),
+            }),
+        );
+    }
+
     match sqlx::query_as::<_, User>("SELECT * FROM users")
         .fetch_all(&state.db_pool)
         .await
@@ -72,14 +80,14 @@ pub async fn get_all(State(state): State<ServerState>) -> impl IntoResponse {
         }) {
         Ok(results) => (
             StatusCode::OK,
-            Json(ModelJsonResponse {
+            Json(DataJsonResponse {
                 data: Some(results),
                 error: None,
             }),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ModelJsonResponse {
+            Json(DataJsonResponse {
                 data: None,
                 error: Some(e.to_string()),
             }),
@@ -87,8 +95,8 @@ pub async fn get_all(State(state): State<ServerState>) -> impl IntoResponse {
     }
 }
 
-pub async fn get(State(state): State<ServerState>, Path(uuid): Path<String>) -> impl IntoResponse {
-    match Uuid::parse_str(&uuid) {
+async fn get_one_user_by_id(state: &ServerState, uuid: &str) -> Result<User, String> {
+    match Uuid::parse_str(uuid) {
         Ok(uuid) => {
             match sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
                 .bind(uuid)
@@ -98,39 +106,96 @@ pub async fn get(State(state): State<ServerState>, Path(uuid): Path<String>) -> 
                     user.password = None;
                     user
                 }) {
-                Ok(user) => (
-                    StatusCode::OK,
-                    Json(ModelJsonResponse {
-                        data: Some(user),
-                        error: None,
-                    }),
-                ),
-                Err(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ModelJsonResponse {
-                        data: None,
-                        error: Some(e.to_string()),
-                    }),
-                ),
+                Ok(user) => Ok(user),
+                Err(e) => Err(e.to_string()),
             }
         }
+        Err(e) => Err(format!("Invalid UUID format: {}", e)),
+    }
+}
+
+pub async fn get_me(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    match get_one_user_by_id(&state, &authenticated_claims.user_id).await {
+        Ok(user) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(user),
+                error: None,
+            }),
+        ),
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ModelJsonResponse {
+            Json(DataJsonResponse {
                 data: None,
-                error: Some(format!("Invalid UUID format: {}", e)),
+                error: Some(e),
             }),
         ),
     }
 }
 
+pub async fn get(
+    State(state): State<ServerState>,
+    Path(uuid): Path<String>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    if !(authenticated_claims.role == "admin" || authenticated_claims.user_id == uuid) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some("Insufficient permissions to access this user".to_string()),
+            }),
+        );
+    }
+
+    match get_one_user_by_id(&state, &uuid).await {
+        Ok(user) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(user),
+                error: None,
+            }),
+        ),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some(e),
+            }),
+        ),
+    }
+}
+
+#[derive(Deserialize, Debug, Iterable)]
+pub struct UpdateUserPayload {
+    name: Option<String>,
+    email: Option<String>,
+    password: Option<String>,
+}
+
 pub async fn update(
     State(state): State<ServerState>,
     Path(uuid): Path<String>,
+    authenticated_claims: authentication::Claims,
     Json(payload): Json<UpdateUserPayload>,
 ) -> impl IntoResponse {
     match Uuid::parse_str(&uuid) {
         Ok(uuid) => {
+            if !(authenticated_claims.role == "admin"
+                || authenticated_claims.user_id == uuid.to_string())
+            {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(DataJsonResponse {
+                        data: None,
+                        error: Some("Insufficient permissions to access this user".to_string()),
+                    }),
+                );
+            }
+
             let mut query_builder = QueryBuilder::new("UPDATE users");
 
             let mut i = 0;
@@ -160,14 +225,14 @@ pub async fn update(
             }) {
                 Ok(user) => (
                     StatusCode::OK,
-                    Json(ModelJsonResponse {
+                    Json(DataJsonResponse {
                         data: Some(user),
                         error: None,
                     }),
                 ),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ModelJsonResponse {
+                    Json(DataJsonResponse {
                         data: None,
                         error: Some(e.to_string()),
                     }),
@@ -176,7 +241,7 @@ pub async fn update(
         }
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ModelJsonResponse {
+            Json(DataJsonResponse {
                 data: None,
                 error: Some(format!("Invalid UUID format: {}", e)),
             }),
@@ -187,9 +252,22 @@ pub async fn update(
 pub async fn delete(
     State(state): State<ServerState>,
     Path(uuid): Path<String>,
+    authenticated_claims: authentication::Claims,
 ) -> impl IntoResponse {
     match Uuid::parse_str(&uuid) {
         Ok(uuid) => {
+            if !(authenticated_claims.role == "admin"
+                || authenticated_claims.user_id == uuid.to_string())
+            {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(DataJsonResponse {
+                        data: None,
+                        error: Some("Insufficient permissions to access this user".to_string()),
+                    }),
+                );
+            }
+
             match sqlx::query_as::<_, User>("DELETE FROM users WHERE id = $1 RETURNING *")
                 .bind(uuid)
                 .fetch_one(&state.db_pool)
@@ -197,14 +275,14 @@ pub async fn delete(
             {
                 Ok(user) => (
                     StatusCode::OK,
-                    Json(ModelJsonResponse {
+                    Json(DataJsonResponse {
                         data: Some(user),
                         error: None,
                     }),
                 ),
                 Err(e) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ModelJsonResponse {
+                    Json(DataJsonResponse {
                         data: None,
                         error: Some(e.to_string()),
                     }),
@@ -213,9 +291,64 @@ pub async fn delete(
         }
         Err(e) => (
             StatusCode::BAD_REQUEST,
-            Json(ModelJsonResponse {
+            Json(DataJsonResponse {
                 data: None,
                 error: Some(format!("Invalid UUID format: {}", e)),
+            }),
+        ),
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct LoginPayload {
+    email: String,
+    password: String,
+}
+
+pub async fn login(
+    State(state): State<ServerState>,
+    Json(payload): Json<LoginPayload>,
+) -> impl IntoResponse {
+    match sqlx::query("SELECT * FROM users WHERE email = $1 AND password = $2")
+        .bind(payload.email)
+        .bind(payload.password)
+        .fetch_one(&state.db_pool)
+        .await
+    {
+        Ok(result) => {
+            let user_id = result.get::<Uuid, _>("id");
+            let user_role = result.get::<String, _>("role");
+            let authenticated_claims = authentication::Claims {
+                user_id: user_id.to_string(),
+                role: user_role,
+                exp: (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as usize,
+            };
+            match encode(
+                &Header::default(),
+                &authenticated_claims,
+                &EncodingKey::from_secret(state.server_settings.server.jwt_secret.as_ref()),
+            ) {
+                Ok(token) => (
+                    StatusCode::OK,
+                    Json(DataJsonResponse {
+                        data: Some(token),
+                        error: None,
+                    }),
+                ),
+                Err(_) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(DataJsonResponse {
+                        error: Some(format!("Failed to generate token")),
+                        data: None,
+                    }),
+                ),
+            }
+        }
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            Json(DataJsonResponse {
+                error: Some("User not found".to_string()),
+                data: None,
             }),
         ),
     }

@@ -11,3 +11,4 @@ core = { path = "../core" }
 tokio = { version = "1.48.0", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = [ "runtime-tokio", "postgres", "macros", "chrono", "uuid" ] }
 struct_iterable = "0.1.1"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }

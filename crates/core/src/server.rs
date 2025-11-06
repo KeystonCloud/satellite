@@ -20,6 +20,7 @@ pub struct ServerConfig {
     pub host: String,
     pub peer_id: String,
     pub ipfs_host: String,
+    pub jwt_secret: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

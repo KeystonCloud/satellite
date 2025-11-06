@@ -6,7 +6,12 @@ pub struct SimpleJsonResponse {
 }
 
 #[derive(Serialize)]
-pub struct ModelJsonResponse<T: Serialize> {
+pub struct DataJsonResponse<T: Serialize> {
     pub data: Option<T>,
     pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ErrorJsonResponse {
+    pub error: String,
 }
