@@ -11,3 +11,4 @@ api-app = { path = "../crates/api-app" }
 web-server = { path = "../crates/web-server" }
 axum = "0.8.6"
 tokio = { version = "1.48.0", features = ["full"] }
+redis = { version = "0.32", features = ["tokio-comp", "cluster-async", "json"] }

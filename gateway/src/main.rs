@@ -1,8 +1,5 @@
 use axum::{Router, routing::get};
-use core::{
-    database::create_db_pool, node::periodic_health_check, server::ServerSettings,
-    server::ServerState,
-};
+use core::{database::create_db_pool, server::ServerSettings, server::ServerState};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -18,11 +15,18 @@ async fn main() {
         }
     };
 
+    let redis_client = match settings.redis.create_client() {
+        Ok(client) => client,
+        Err(e) => {
+            panic!("Failed to create Redis client: {}", e);
+        }
+    };
+
     let server_state: ServerState = ServerState {
         server_settings: settings.clone(),
-        node_registry: Arc::new(Mutex::new(HashMap::new())),
         app_registry: Arc::new(Mutex::new(HashMap::new())),
         db_pool: db_pool,
+        redis_client: redis_client,
     };
 
     let api_user_router = api_user::create_router(server_state.clone());
@@ -45,16 +49,6 @@ async fn main() {
     println!("API: {}", addr);
     println!("Gateway PEER ID: {}", settings.server.peer_id);
     println!("----------------------");
-
-    let registry_clone_for_health_check = server_state.node_registry.clone();
-    tokio::spawn(async move {
-        periodic_health_check(
-            registry_clone_for_health_check,
-            settings.node_health.check_interval_seconds,
-            settings.node_health.staleness_seconds,
-        )
-        .await;
-    });
 
     axum::serve(
         listener,

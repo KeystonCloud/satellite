@@ -3,15 +3,16 @@ use serde::Deserialize;
 use crate::{
     app::AppRegistry,
     database::{DatabaseConfig, DbPool},
-    node::{NodeHealthConfig, NodeRegistry},
+    node::NodeHealthConfig,
+    redis::{RedisClient, RedisSettings},
 };
 
 #[derive(Clone)]
 pub struct ServerState {
     pub server_settings: ServerSettings,
-    pub node_registry: NodeRegistry,
     pub app_registry: AppRegistry,
     pub db_pool: DbPool,
+    pub redis_client: RedisClient,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -28,6 +29,7 @@ pub struct ServerSettings {
     pub server: ServerConfig,
     pub node_health: NodeHealthConfig,
     pub database: DatabaseConfig,
+    pub redis: RedisSettings,
 }
 
 impl ServerSettings {

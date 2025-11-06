@@ -1,9 +1,11 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use redis::{AsyncIter, AsyncTypedCommands};
 use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use core::{app::AppInfo, json::SimpleJsonResponse, server::ServerState};
+use core::{app::AppInfo, json::SimpleJsonResponse, node::NodeInfo, server::ServerState};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppDeployPayload {
@@ -119,7 +121,18 @@ pub async fn post(
     }
 
     let client = Client::new();
-    let nodes_to_deploy = state.node_registry.lock().unwrap().clone(); // TODO: filter nodes based on criteria (geo, capacity, reputation...)
+    let nodes_to_deploy = match get_all_active_nodes(&state).await {
+        Ok(nodes_map) => {
+            if nodes_map.is_empty() {
+                println!("[API-App] App deployed, but no active node found to pin it.");
+            }
+            nodes_map
+        }
+        Err(e) => {
+            eprintln!("[API-App] Error in retrieving nodes: {}.", e);
+            HashMap::new() // On continue avec une map vide
+        }
+    }; // TODO: filter nodes based on criteria (geo, capacity, reputation...)
 
     // EXAMPLE : send deployment on all nodes
     for (id, node) in nodes_to_deploy {
@@ -282,4 +295,48 @@ async fn add_to_ipfs(ipfs_host: &str, file_path: &str) -> Result<String, String>
     let kubo_resp: IPFSAddResponse = resp.json().await.map_err(|e| e.to_string())?;
 
     Ok(kubo_resp.hash)
+}
+
+async fn get_all_active_nodes(state: &ServerState) -> Result<HashMap<String, NodeInfo>, String> {
+    let mut conn = state
+        .redis_client
+        .get_multiplexed_tokio_connection()
+        .await
+        .map_err(|e| format!("Error in Redis connexion: {}", e))?;
+
+    let keys: Vec<String> = {
+        let mut iter: AsyncIter<String> = conn
+            .scan_match("nodes:*")
+            .await
+            .map_err(|e| format!("Error in Redis SCAN: {}", e))?;
+
+        let mut keys_tmp = Vec::new();
+        while let Some(key) = iter.next_item().await {
+            match key {
+                Ok(k) => keys_tmp.push(k),
+                Err(_) => (),
+            }
+        }
+        keys_tmp
+    };
+
+    if keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let values: Vec<Option<String>> = conn
+        .mget(&keys)
+        .await
+        .map_err(|e| format!("Error in Redis MGET: {}", e))?;
+
+    let mut nodes_map = HashMap::new();
+    for (key, value) in keys.into_iter().zip(values.into_iter()) {
+        if let Ok(node_info) = serde_json::from_str::<NodeInfo>(&value.unwrap()) {
+            if let Some(id) = key.strip_prefix("nodes:") {
+                nodes_map.insert(id.to_string(), node_info);
+            }
+        }
+    }
+
+    Ok(nodes_map)
 }

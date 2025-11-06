@@ -12,3 +12,4 @@ sqlx = { version = "0.8", default-features = false, features = [ "runtime-tokio"
 axum = "0.8.6"
 axum-extra = { version = "0.12", features = ["typed-header"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+redis = { version = "0.32", features = ["tokio-comp", "cluster-async", "json"] }

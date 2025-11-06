@@ -16,3 +16,9 @@ username = "keyston"
 password = "keystonpassword"
 database_name = "keyston_db"
 pool_size = 5
+
+[redis]
+host = "redis"
+port = 6379
+user = "default"
+password = "redispassword"

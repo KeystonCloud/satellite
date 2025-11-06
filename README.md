@@ -32,6 +32,13 @@ If you want to use docker compose for development, you can add into ``services``
     ports:
       - 8080:8080
 
+  redis:
+    image: redis:8
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "redispassword"]
+    volumes:
+      - redis-data:/data
+
   satellite:
     build:
       context: ./satellite
@@ -45,6 +52,7 @@ If you want to use docker compose for development, you can add into ``services``
       - 8000:8000
     depends_on:
       - postgres
+      - redis
     deploy:
       replicas: 1
 ```
@@ -54,7 +62,7 @@ Add new volume storage for postgres data in ``volumes`` part of your docker comp
   postgres-data:
 ```
 
-This stack will create a postgres database, an adminer service and the satellite service. The satellite service will be built using the `Dockerfile.dev` file located in the `satellite` folder and use starting script `start.sh`.
+This stack will create a postgres database, an adminer service, a redis database and the satellite service. The satellite service will be built using the `Dockerfile.dev` file located in the `satellite` folder and use starting script `start.sh`.
 This starting script will run the application by using `cargo watch` to automatically reload the application when code changes are detected.
 
 
