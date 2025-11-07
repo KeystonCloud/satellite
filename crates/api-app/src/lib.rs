@@ -2,6 +2,8 @@ use axum::{Router, routing::post};
 
 use core::server::ServerState;
 
+pub mod models;
+pub mod payloads;
 pub mod routes;
 
 pub fn create_router(state: ServerState) -> Router {

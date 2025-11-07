@@ -28,6 +28,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sqlx",
+ "struct_iterable",
  "tokio",
 ]
 
