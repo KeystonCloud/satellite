@@ -5,48 +5,62 @@ use axum::{
     response::IntoResponse,
 };
 use jsonwebtoken::{EncodingKey, Header, encode};
-use serde::Deserialize;
-use sqlx::{QueryBuilder, Row, types::Uuid};
-use struct_iterable::Iterable;
+use sqlx::types::Uuid;
 
-use crate::models::user::User;
-use core::{
-    authentication,
-    json::{DataJsonResponse, SimpleJsonResponse},
-    server::ServerState,
+use crate::{
+    models::{team::Team, user::User},
+    payloads::{
+        team::CreateTeamPayload,
+        user::{CreateUserPayload, LoginPayload, UpdateUserPayload},
+    },
 };
-
-#[derive(Deserialize, Debug)]
-pub struct CreateUserPayload {
-    name: String,
-    email: String,
-    password: String,
-}
+use core::{authentication, json::DataJsonResponse, server::ServerState};
 
 pub async fn create(
     State(state): State<ServerState>,
     Json(payload): Json<CreateUserPayload>,
 ) -> impl IntoResponse {
-    match sqlx::query("INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id")
-        .bind(payload.name)
-        .bind(payload.email)
-        .bind(payload.password)
-        .fetch_one(&state.db_pool)
-        .await
-    {
-        Ok(result) => {
-            let user_id = result.get::<Uuid, _>("id");
-            (
-                StatusCode::OK,
-                Json(SimpleJsonResponse {
-                    message: format!("User created with ID: {}", user_id),
-                }),
-            )
+    match User::create(&state.db_pool, &payload).await {
+        Ok(user) => {
+            let user_team = CreateTeamPayload {
+                name: format!("{}'s Team", user.name),
+            };
+
+            match Team::create(&state.db_pool, &user_team).await {
+                Ok(team) => match team.associate_user(&state.db_pool, &user).await {
+                    Ok(_) => (
+                        StatusCode::OK,
+                        Json(DataJsonResponse {
+                            data: Some(user),
+                            error: None,
+                        }),
+                    ),
+                    Err(e) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(DataJsonResponse {
+                                error: Some(format!("Failed to associate user with team: {}", e)),
+                                data: None,
+                            }),
+                        );
+                    }
+                },
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(DataJsonResponse {
+                            error: Some(format!("Failed to create user's team: {}", e)),
+                            data: None,
+                        }),
+                    );
+                }
+            }
         }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(SimpleJsonResponse {
-                message: format!("Failed to create user: {}", e),
+            Json(DataJsonResponse {
+                error: Some(format!("Failed to create user: {}", e)),
+                data: None,
             }),
         ),
     }
@@ -95,47 +109,6 @@ pub async fn get_all(
     }
 }
 
-async fn get_one_user_by_id(state: &ServerState, uuid: &str) -> Result<User, String> {
-    match Uuid::parse_str(uuid) {
-        Ok(uuid) => {
-            match sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-                .bind(uuid)
-                .fetch_one(&state.db_pool)
-                .await
-                .map(|mut user| {
-                    user.password = None;
-                    user
-                }) {
-                Ok(user) => Ok(user),
-                Err(e) => Err(e.to_string()),
-            }
-        }
-        Err(e) => Err(format!("Invalid UUID format: {}", e)),
-    }
-}
-
-pub async fn get_me(
-    State(state): State<ServerState>,
-    authenticated_claims: authentication::Claims,
-) -> impl IntoResponse {
-    match get_one_user_by_id(&state, &authenticated_claims.user_id).await {
-        Ok(user) => (
-            StatusCode::OK,
-            Json(DataJsonResponse {
-                data: Some(user),
-                error: None,
-            }),
-        ),
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            Json(DataJsonResponse {
-                data: None,
-                error: Some(e),
-            }),
-        ),
-    }
-}
-
 pub async fn get(
     State(state): State<ServerState>,
     Path(uuid): Path<String>,
@@ -151,7 +124,7 @@ pub async fn get(
         );
     }
 
-    match get_one_user_by_id(&state, &uuid).await {
+    match User::find_by_id(&state.db_pool, &uuid).await {
         Ok(user) => (
             StatusCode::OK,
             Json(DataJsonResponse {
@@ -167,13 +140,6 @@ pub async fn get(
             }),
         ),
     }
-}
-
-#[derive(Deserialize, Debug, Iterable)]
-pub struct UpdateUserPayload {
-    name: Option<String>,
-    email: Option<String>,
-    password: Option<String>,
 }
 
 pub async fn update(
@@ -196,33 +162,7 @@ pub async fn update(
                 );
             }
 
-            let mut query_builder = QueryBuilder::new("UPDATE users");
-
-            let mut i = 0;
-            for (name, field_value) in payload.iter() {
-                if let Some(value) = field_value.downcast_ref::<Option<String>>() {
-                    if let Some(v) = value {
-                        if i == 0 {
-                            query_builder.push(" SET ");
-                        } else {
-                            query_builder.push(", ");
-                        }
-
-                        query_builder.push(name).push(" = ").push_bind(v);
-                        i += 1;
-                    }
-                }
-            }
-
-            query_builder.push(" WHERE id = ").push_bind(uuid);
-            query_builder.push(" RETURNING *");
-
-            let query = query_builder.build_query_as::<User>();
-
-            match query.fetch_one(&state.db_pool).await.map(|mut user| {
-                user.password = None;
-                user
-            }) {
+            match User::update_by_id(&state.db_pool, &uuid.to_string(), &payload).await {
                 Ok(user) => (
                     StatusCode::OK,
                     Json(DataJsonResponse {
@@ -268,11 +208,7 @@ pub async fn delete(
                 );
             }
 
-            match sqlx::query_as::<_, User>("DELETE FROM users WHERE id = $1 RETURNING *")
-                .bind(uuid)
-                .fetch_one(&state.db_pool)
-                .await
-            {
+            match User::delete_by_id(&state.db_pool, &uuid.to_string()).await {
                 Ok(user) => (
                     StatusCode::OK,
                     Json(DataJsonResponse {
@@ -299,28 +235,15 @@ pub async fn delete(
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct LoginPayload {
-    email: String,
-    password: String,
-}
-
 pub async fn login(
     State(state): State<ServerState>,
     Json(payload): Json<LoginPayload>,
 ) -> impl IntoResponse {
-    match sqlx::query("SELECT * FROM users WHERE email = $1 AND password = $2")
-        .bind(payload.email)
-        .bind(payload.password)
-        .fetch_one(&state.db_pool)
-        .await
-    {
-        Ok(result) => {
-            let user_id = result.get::<Uuid, _>("id");
-            let user_role = result.get::<String, _>("role");
+    match User::login(&state.db_pool, &payload).await {
+        Ok(user) => {
             let authenticated_claims = authentication::Claims {
-                user_id: user_id.to_string(),
-                role: user_role,
+                user_id: user.id.to_string(),
+                role: user.role,
                 exp: (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as usize,
             };
             match encode(
@@ -349,6 +272,73 @@ pub async fn login(
             Json(DataJsonResponse {
                 error: Some("User not found".to_string()),
                 data: None,
+            }),
+        ),
+    }
+}
+
+pub async fn get_me(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    match User::find_by_id(&state.db_pool, &authenticated_claims.user_id).await {
+        Ok(user) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(user),
+                error: None,
+            }),
+        ),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some(e),
+            }),
+        ),
+    }
+}
+
+pub async fn update_me(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+    Json(payload): Json<UpdateUserPayload>,
+) -> impl IntoResponse {
+    match User::update_by_id(&state.db_pool, &authenticated_claims.user_id, &payload).await {
+        Ok(user) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(user),
+                error: None,
+            }),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        ),
+    }
+}
+
+pub async fn delete_me(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    match User::delete_by_id(&state.db_pool, &authenticated_claims.user_id).await {
+        Ok(user) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(user),
+                error: None,
+            }),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(DataJsonResponse {
+                data: None,
+                error: Some(e.to_string()),
             }),
         ),
     }
