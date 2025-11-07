@@ -48,6 +48,7 @@ If you want to use docker compose for development, you can add into ``services``
       DATABASE_URL: postgres://keyston:keystonpassword@postgres:5432/keyston_db # For sqlx-cli
     volumes:
       - ./satellite:/app
+      - ipfs-satellite-data:/root/.ipfs
     ports:
       - 8000:8000
     depends_on:
@@ -57,10 +58,11 @@ If you want to use docker compose for development, you can add into ``services``
       replicas: 1
 ```
 
-Add new volumes storage for postgres and redis datas in ``volumes`` part of your docker compose file:
+Add volumes storage for postgres and redis datas in ``volumes`` part of your docker compose file:
 ```yaml
   postgres-data:
   redis-data:
+  ipfs-satellite-data:
 ```
 
 This stack will create a postgres database, an adminer service, a redis database and the satellite service. The satellite service will be built using the `Dockerfile.dev` file located in the `satellite` folder and use starting script `start.sh`.
