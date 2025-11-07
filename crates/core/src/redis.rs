@@ -13,12 +13,10 @@ pub struct RedisSettings {
 
 impl RedisSettings {
     pub fn url(&self) -> String {
-        let url = format!(
+        format!(
             "redis://{}:{}@{}:{}",
             self.user, self.password, self.host, self.port
-        );
-        println!("Redis url: {}", url);
-        url
+        )
     }
 
     pub fn create_client(&self) -> Result<RedisClient, RedisError> {

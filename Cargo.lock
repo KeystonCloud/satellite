@@ -41,6 +41,8 @@ dependencies = [
  "redis",
  "serde",
  "serde_json",
+ "sqlx",
+ "struct_iterable",
 ]
 
 [[package]]
