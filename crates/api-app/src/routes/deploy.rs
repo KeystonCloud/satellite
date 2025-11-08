@@ -4,11 +4,24 @@ use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use core::{app::AppInfo, json::SimpleJsonResponse, node::NodeInfo, server::ServerState};
+use core::{database::DbPool, json::SimpleJsonResponse, node::NodeInfo, server::ServerState};
 use std::collections::HashMap;
+
+use crate::{
+    models::{
+        app::App,
+        deployment::{Deployment, DeploymentStatus},
+    },
+    payloads::{
+        app::{CreateAppPayload, UpdateAppPayload},
+        deployment::{CreateDeploymentPayload, UpdateDeploymentPayload},
+    },
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppDeployPayload {
+    id: Option<String>,
+    team_id: String,
     name: String,
     content: String,
 }
@@ -51,8 +64,9 @@ pub async fn post(
     State(state): State<ServerState>,
     Json(payload): Json<AppDeployPayload>,
 ) -> impl IntoResponse {
+    // Temporary store file
     let tmp_path = "/tmp/keystone_deploy.tmp";
-    if let Err(e) = fs::write(tmp_path, payload.content).await {
+    if let Err(e) = fs::write(tmp_path, &payload.content).await {
         eprintln!("[API-App] Error in file creation: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -62,8 +76,26 @@ pub async fn post(
         );
     }
 
+    // Find or create app in database
+    let app = match find_or_create_app(&state.db_pool, &payload).await {
+        Ok(app) => app,
+        Err(e) => {
+            eprintln!("[API-App] {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: format!("{}", e),
+                }),
+            );
+        }
+    };
+
+    // Deploy app to IPFS
     let cid = match add_to_ipfs(&state.server_settings.server.ipfs_host, tmp_path).await {
-        Ok(cid) => cid,
+        Ok(cid) => {
+            println!("[API-App] File added to IPFS. CID: {}", cid);
+            cid
+        }
         Err(e) => {
             eprintln!("[API-App] Add to IPFS failed: {}", e);
             return (
@@ -74,12 +106,35 @@ pub async fn post(
             );
         }
     };
-    println!("[API-App] File added to IPFS. CID: {}", cid);
+    let deployment = match Deployment::create(
+        &state.db_pool,
+        &CreateDeploymentPayload {
+            app_id: app.id.to_string(),
+            cid: cid.clone(),
+        },
+    )
+    .await
+    {
+        Ok(deployment) => deployment,
+        Err(e) => {
+            eprintln!("[API-App] Error in database deployment creation: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: "Error in deployment creation".to_string(),
+                }),
+            );
+        }
+    };
 
+    // Find or create IPNS key
     let key_info =
         match find_or_create_ipns_key(&state.server_settings.server.ipfs_host, &payload.name).await
         {
-            Ok(info) => info,
+            Ok(info) => {
+                println!("[API-App] IPNS key: {}", info.id);
+                info
+            }
             Err(e) => {
                 eprintln!("[API-App] IPNS management failed: {}", e);
                 return (
@@ -90,8 +145,54 @@ pub async fn post(
                 );
             }
         };
-    println!("[API-App] IPNS key: {}", key_info.id);
+    let app = match app
+        .update(
+            &state.db_pool,
+            &UpdateAppPayload {
+                team_id: None,
+                name: None,
+                key_name: Some(key_info.name.clone()),
+                ipns_name: None,
+            },
+        )
+        .await
+    {
+        Ok(app) => app,
+        Err(e) => {
+            eprintln!("[API-App] Error in database app update: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: format!("Error in app update: {}", e),
+                }),
+            );
+        }
+    };
 
+    // Deploy to IPNS in background task
+    let deployment = match deployment
+        .update(
+            &state.db_pool,
+            &UpdateDeploymentPayload {
+                app_id: None,
+                cid: None,
+                status: Some(DeploymentStatus::PUBLISHING),
+            },
+        )
+        .await
+    {
+        Ok(deployment) => deployment,
+        Err(e) => {
+            eprintln!("[API-App] Error in database deployment update: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: format!("Error in deployment update: {}", e),
+                }),
+            );
+        }
+    };
+    let db_pool_clone = state.db_pool.clone();
     let app_name_clone = payload.name.clone();
     let ipfs_host_clone = state.server_settings.server.ipfs_host.clone();
     let key_name_clone = key_info.name.clone();
@@ -103,22 +204,43 @@ pub async fn post(
                     "[API-App] App \"{}\" published on IPNS ({} -> {})",
                     app_name_clone, ipns_result.name, ipns_result.value
                 );
+                let _ = app
+                    .update(
+                        &db_pool_clone,
+                        &UpdateAppPayload {
+                            team_id: None,
+                            name: None,
+                            key_name: None,
+                            ipns_name: Some(ipns_result.name.clone()),
+                        },
+                    )
+                    .await;
+                let _ = deployment
+                    .update(
+                        &db_pool_clone,
+                        &UpdateDeploymentPayload {
+                            app_id: None,
+                            cid: None,
+                            status: Some(DeploymentStatus::DEPLOYED),
+                        },
+                    )
+                    .await;
             }
             Err(e) => {
                 eprintln!("[API-App] IPNS publication failed: {}", e);
+                let _ = deployment
+                    .update(
+                        &db_pool_clone,
+                        &UpdateDeploymentPayload {
+                            app_id: None,
+                            cid: None,
+                            status: Some(DeploymentStatus::FAILED),
+                        },
+                    )
+                    .await;
             }
         };
     });
-
-    if let Err(e) = update_or_create_app_info(&state, &payload.name, &cid, &key_info) {
-        eprintln!("[API-App] Create / Update app info failed: {}", e);
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(SimpleJsonResponse {
-                message: e.to_string(),
-            }),
-        );
-    }
 
     let client = Client::new();
     let nodes_to_deploy = match get_all_active_nodes(&state).await {
@@ -183,35 +305,26 @@ pub async fn post(
     )
 }
 
-fn update_or_create_app_info(
-    state: &ServerState,
-    name: &str,
-    cid: &str,
-    key_info: &KeyInfo,
-) -> Result<(), String> {
-    let mut app_registry = state.app_registry.lock().unwrap();
-
-    match app_registry.get_mut(name) {
-        Some(app) => {
-            app.current_cid = cid.to_string();
-            app.key_name = key_info.name.clone();
-            app.ipns_name = key_info.id.clone();
-            println!("[API-App] Updated app info for \"{}\"", name);
+async fn find_or_create_app(db_pool: &DbPool, payload: &AppDeployPayload) -> Result<App, String> {
+    if let Some(id) = &payload.id {
+        match App::find_by_id(db_pool, id).await {
+            Ok(app) => Ok(app),
+            Err(e) => Err(format!("Error finding app by id in database: {}", e)),
         }
-        None => {
-            app_registry.insert(
-                name.to_string(),
-                AppInfo {
-                    name: name.to_string(),
-                    current_cid: cid.to_string(),
-                    key_name: key_info.name.clone(),
-                    ipns_name: key_info.id.clone(),
-                },
-            );
-            println!("[API-App] Created new app info for \"{}\"", name);
+    } else {
+        match App::create(
+            db_pool,
+            &CreateAppPayload {
+                team_id: payload.team_id.clone(),
+                name: payload.name.clone(),
+            },
+        )
+        .await
+        {
+            Ok(app) => Ok(app),
+            Err(e) => Err(format!("Error creating app in database: {}", e)),
         }
     }
-    Ok(())
 }
 
 async fn find_or_create_ipns_key(ipfs_host: &str, app_name: &str) -> Result<KeyInfo, String> {

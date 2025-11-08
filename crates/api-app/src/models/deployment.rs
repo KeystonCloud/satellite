@@ -52,17 +52,21 @@ impl Deployment {
         db_pool: &DbPool,
         payload: &CreateDeploymentPayload,
     ) -> Result<Deployment, String> {
-        match sqlx::query_as::<_, Deployment>(
-            "INSERT INTO deployments (app_id, cid, status) VALUES ($1, $2, $3) RETURNING *",
-        )
-        .bind(payload.app_id.clone())
-        .bind(payload.cid.clone())
-        .bind(payload.status)
-        .fetch_one(db_pool)
-        .await
-        {
-            Ok(result) => Ok(result),
-            Err(e) => Err(e.to_string()),
+        match Uuid::parse_str(&payload.app_id) {
+            Ok(app_id) => {
+                match sqlx::query_as::<_, Deployment>(
+                    "INSERT INTO deployments (app_id, cid) VALUES ($1, $2) RETURNING *",
+                )
+                .bind(app_id)
+                .bind(payload.cid.clone())
+                .fetch_one(db_pool)
+                .await
+                {
+                    Ok(result) => Ok(result),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+            Err(e) => Err(format!("Invalid UUID format for app_id: {}", e)),
         }
     }
 
@@ -87,38 +91,15 @@ impl Deployment {
         id: &String,
         payload: &UpdateDeploymentPayload,
     ) -> Result<Deployment, String> {
-        match Uuid::parse_str(id) {
-            Ok(uuid) => {
-                let mut query_builder = QueryBuilder::new("UPDATE deployments");
+        deployment_update_by_id(db_pool, id, payload).await
+    }
 
-                let mut i = 0;
-                for (name, field_value) in payload.iter() {
-                    if let Some(value) = field_value.downcast_ref::<Option<String>>() {
-                        if let Some(v) = value {
-                            if i == 0 {
-                                query_builder.push(" SET ");
-                            } else {
-                                query_builder.push(", ");
-                            }
-
-                            query_builder.push(name).push(" = ").push_bind(v);
-                            i += 1;
-                        }
-                    }
-                }
-
-                query_builder.push(" WHERE id = ").push_bind(uuid);
-                query_builder.push(" RETURNING *");
-
-                let query = query_builder.build_query_as::<Deployment>();
-
-                match query.fetch_one(db_pool).await {
-                    Ok(result) => Ok(result),
-                    Err(e) => Err(e.to_string()),
-                }
-            }
-            Err(e) => Err(format!("Invalid UUID format: {}", e)),
-        }
+    pub async fn update(
+        &self,
+        db_pool: &DbPool,
+        payload: &UpdateDeploymentPayload,
+    ) -> Result<Deployment, String> {
+        deployment_update_by_id(db_pool, &self.id.to_string(), payload).await
     }
 
     pub async fn delete_by_id(db_pool: &DbPool, id: &String) -> Result<Deployment, String> {
@@ -137,5 +118,59 @@ impl Deployment {
             }
             Err(e) => Err(format!("Invalid UUID format: {}", e)),
         }
+    }
+}
+
+async fn deployment_update_by_id(
+    db_pool: &DbPool,
+    id: &String,
+    payload: &UpdateDeploymentPayload,
+) -> Result<Deployment, String> {
+    match Uuid::parse_str(id) {
+        Ok(uuid) => {
+            let mut query_builder = QueryBuilder::new("UPDATE deployments");
+
+            let mut i = 0;
+            for (name, field_value) in payload.iter() {
+                if let Some(value) = field_value.downcast_ref::<Option<String>>() {
+                    if let Some(v) = value {
+                        if i == 0 {
+                            query_builder.push(" SET ");
+                        } else {
+                            query_builder.push(", ");
+                        }
+
+                        query_builder.push(name).push(" = ").push_bind(v);
+                        i += 1;
+                    }
+                }
+
+                if let Some(value) = field_value.downcast_ref::<Option<DeploymentStatus>>() {
+                    if let Some(v) = value {
+                        if i == 0 {
+                            query_builder.push(" SET ");
+                        } else {
+                            query_builder.push(", ");
+                        }
+
+                        query_builder.push(name).push(" = ").push_bind(v);
+                        i += 1;
+                    }
+                }
+            }
+
+            query_builder.push(" WHERE id = ").push_bind(uuid);
+            query_builder.push(" RETURNING *");
+
+            println!("SQL: {}", query_builder.sql());
+
+            let query = query_builder.build_query_as::<Deployment>();
+
+            match query.fetch_one(db_pool).await {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e.to_string()),
+            }
+        }
+        Err(e) => Err(format!("Invalid UUID format: {}", e)),
     }
 }

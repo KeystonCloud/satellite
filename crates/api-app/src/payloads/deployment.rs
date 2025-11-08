@@ -7,7 +7,6 @@ use crate::models::deployment::DeploymentStatus;
 pub struct CreateDeploymentPayload {
     pub app_id: String,
     pub cid: String,
-    pub status: DeploymentStatus,
 }
 
 #[derive(Deserialize, Debug, Iterable)]

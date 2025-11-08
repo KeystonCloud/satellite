@@ -1,5 +1,3 @@
-use core::database::DbPool;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use sqlx::{
@@ -10,6 +8,7 @@ use sqlx::{
 use struct_iterable::Iterable;
 
 use crate::payloads::deployment_node::{CreateDeploymentNodePayload, UpdateDeploymentNodePayload};
+use core::database::DbPool;
 
 #[derive(Debug, Type, Serialize, Deserialize, Clone, Copy)]
 #[sqlx(type_name = "deployment_status")]
