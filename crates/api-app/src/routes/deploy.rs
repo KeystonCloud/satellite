@@ -11,10 +11,12 @@ use crate::{
     models::{
         app::App,
         deployment::{Deployment, DeploymentStatus},
+        deployment_node::{DeploymentNode, PinStatus},
     },
     payloads::{
         app::{CreateAppPayload, UpdateAppPayload},
         deployment::{CreateDeploymentPayload, UpdateDeploymentPayload},
+        deployment_node::{CreateDeploymentNodePayload, UpdateDeploymentNodePayload},
     },
 };
 
@@ -203,6 +205,7 @@ pub async fn post(
     let ipfs_host_clone = state.server_settings.server.ipfs_host.clone();
     let key_name_clone = key_info.name.clone();
     let cid_clone = cid.clone();
+    let deployment_clone = deployment.clone();
     tokio::spawn(async move {
         match publish_to_ipns(&ipfs_host_clone, &key_name_clone, &cid_clone).await {
             Ok(ipns_result) => {
@@ -221,7 +224,7 @@ pub async fn post(
                         },
                     )
                     .await;
-                let _ = deployment
+                let _ = deployment_clone
                     .update(
                         &db_pool_clone,
                         &UpdateDeploymentPayload {
@@ -234,7 +237,7 @@ pub async fn post(
             }
             Err(e) => {
                 eprintln!("[API-App] IPNS publication failed: {}", e);
-                let _ = deployment
+                let _ = deployment_clone
                     .update(
                         &db_pool_clone,
                         &UpdateDeploymentPayload {
@@ -269,24 +272,61 @@ pub async fn post(
             name: app.name.clone(),
             cid: cid.clone(),
         };
+        let state_clone = state.clone();
+        let deployment_clone = deployment.clone();
 
         tokio::spawn(async move {
-            let res = client_clone
+            let deployment_node = match DeploymentNode::create(
+                &state_clone.db_pool,
+                &CreateDeploymentNodePayload {
+                    deployment_id: deployment_clone.id.to_string(),
+                    node_id: id.clone(),
+                },
+            )
+            .await
+            {
+                Ok(deployment_node) => deployment_node,
+                Err(e) => {
+                    eprintln!("[API-App] Error creating deployment_node record: {}", e);
+                    return;
+                }
+            };
+
+            match client_clone
                 .post(&deploy_url)
                 .json(&node_payload)
                 .send()
-                .await;
-
-            match res {
+                .await
+            {
                 Ok(response) => {
                     if response.status().is_success() {
                         println!("[API-App] Send app deployment to node: id={}", id);
+                        let _ = deployment_node
+                            .update(
+                                &state_clone.db_pool,
+                                &UpdateDeploymentNodePayload {
+                                    deployment_id: None,
+                                    node_id: None,
+                                    status: Some(PinStatus::PINNED),
+                                },
+                            )
+                            .await;
                     } else {
                         println!(
                             "[API-App] Failed to app deployment to node: id={}, status={}",
                             id,
                             response.status()
                         );
+                        let _ = deployment_node
+                            .update(
+                                &state_clone.db_pool,
+                                &UpdateDeploymentNodePayload {
+                                    deployment_id: None,
+                                    node_id: None,
+                                    status: Some(PinStatus::FAILED),
+                                },
+                            )
+                            .await;
                     }
                 }
                 Err(e) => {
@@ -294,6 +334,16 @@ pub async fn post(
                         "[API-App] Error sending app deployment to node: id={}, error={}",
                         id, e
                     );
+                    let _ = deployment_node
+                        .update(
+                            &state_clone.db_pool,
+                            &UpdateDeploymentNodePayload {
+                                deployment_id: None,
+                                node_id: None,
+                                status: Some(PinStatus::FAILED),
+                            },
+                        )
+                        .await;
                 }
             }
         });

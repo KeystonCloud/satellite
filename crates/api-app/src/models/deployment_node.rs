@@ -11,7 +11,7 @@ use crate::payloads::deployment_node::{CreateDeploymentNodePayload, UpdateDeploy
 use core::database::DbPool;
 
 #[derive(Debug, Type, Serialize, Deserialize, Clone, Copy)]
-#[sqlx(type_name = "deployment_status")]
+#[sqlx(type_name = "pin_status")]
 pub enum PinStatus {
     #[sqlx(rename = "PINNING")]
     PINNING,
@@ -52,17 +52,24 @@ impl DeploymentNode {
         db_pool: &DbPool,
         payload: &CreateDeploymentNodePayload,
     ) -> Result<DeploymentNode, String> {
-        match sqlx::query_as::<_, DeploymentNode>(
-            "INSERT INTO deployments_nodes (deployment_id, node_id, status) VALUES ($1, $2, $3) RETURNING *",
-        )
-        .bind(payload.deployment_id.clone())
-        .bind(payload.node_id.clone())
-        .bind(payload.status)
-        .fetch_one(db_pool)
-        .await
-        {
-            Ok(result) => Ok(result),
-            Err(e) => Err(e.to_string()),
+        match Uuid::parse_str(&payload.deployment_id) {
+            Ok(deployment_uuid) => match Uuid::parse_str(&payload.node_id) {
+                Ok(node_uuid) => {
+                    return match sqlx::query_as::<_, DeploymentNode>(
+                        "INSERT INTO deployments_nodes (deployment_id, node_id) VALUES ($1, $2) RETURNING *",
+                    )
+                    .bind(deployment_uuid)
+                    .bind(node_uuid)
+                    .fetch_one(db_pool)
+                    .await
+                    {
+                        Ok(result) => Ok(result),
+                        Err(e) => Err(e.to_string()),
+                    };
+                }
+                Err(e) => return Err(format!("Invalid node_id UUID format: {}", e)),
+            },
+            Err(e) => return Err(format!("Invalid deployment_id UUID format: {}", e)),
         }
     }
 
@@ -89,38 +96,15 @@ impl DeploymentNode {
         id: &String,
         payload: &UpdateDeploymentNodePayload,
     ) -> Result<DeploymentNode, String> {
-        match Uuid::parse_str(id) {
-            Ok(uuid) => {
-                let mut query_builder = QueryBuilder::new("UPDATE deployments_nodes");
+        deployment_node_update_by_id(db_pool, id, payload).await
+    }
 
-                let mut i = 0;
-                for (name, field_value) in payload.iter() {
-                    if let Some(value) = field_value.downcast_ref::<Option<String>>() {
-                        if let Some(v) = value {
-                            if i == 0 {
-                                query_builder.push(" SET ");
-                            } else {
-                                query_builder.push(", ");
-                            }
-
-                            query_builder.push(name).push(" = ").push_bind(v);
-                            i += 1;
-                        }
-                    }
-                }
-
-                query_builder.push(" WHERE id = ").push_bind(uuid);
-                query_builder.push(" RETURNING *");
-
-                let query = query_builder.build_query_as::<DeploymentNode>();
-
-                match query.fetch_one(db_pool).await {
-                    Ok(result) => Ok(result),
-                    Err(e) => Err(e.to_string()),
-                }
-            }
-            Err(e) => Err(format!("Invalid UUID format: {}", e)),
-        }
+    pub async fn update(
+        &self,
+        db_pool: &DbPool,
+        payload: &UpdateDeploymentNodePayload,
+    ) -> Result<DeploymentNode, String> {
+        deployment_node_update_by_id(db_pool, &self.id.to_string(), payload).await
     }
 
     pub async fn delete_by_id(db_pool: &DbPool, id: &String) -> Result<DeploymentNode, String> {
@@ -139,5 +123,56 @@ impl DeploymentNode {
             }
             Err(e) => Err(format!("Invalid UUID format: {}", e)),
         }
+    }
+}
+
+async fn deployment_node_update_by_id(
+    db_pool: &DbPool,
+    id: &String,
+    payload: &UpdateDeploymentNodePayload,
+) -> Result<DeploymentNode, String> {
+    match Uuid::parse_str(id) {
+        Ok(uuid) => {
+            let mut query_builder = QueryBuilder::new("UPDATE deployments_nodes");
+
+            let mut i = 0;
+            for (name, field_value) in payload.iter() {
+                if let Some(value) = field_value.downcast_ref::<Option<String>>() {
+                    if let Some(v) = value {
+                        if i == 0 {
+                            query_builder.push(" SET ");
+                        } else {
+                            query_builder.push(", ");
+                        }
+
+                        query_builder.push(name).push(" = ").push_bind(v);
+                        i += 1;
+                    }
+                }
+                if let Some(value) = field_value.downcast_ref::<Option<PinStatus>>() {
+                    if let Some(v) = value {
+                        if i == 0 {
+                            query_builder.push(" SET ");
+                        } else {
+                            query_builder.push(", ");
+                        }
+
+                        query_builder.push(name).push(" = ").push_bind(v);
+                        i += 1;
+                    }
+                }
+            }
+
+            query_builder.push(" WHERE id = ").push_bind(uuid);
+            query_builder.push(" RETURNING *");
+
+            let query = query_builder.build_query_as::<DeploymentNode>();
+
+            match query.fetch_one(db_pool).await {
+                Ok(result) => Ok(result),
+                Err(e) => Err(e.to_string()),
+            }
+        }
+        Err(e) => Err(format!("Invalid UUID format: {}", e)),
     }
 }

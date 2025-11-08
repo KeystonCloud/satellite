@@ -7,7 +7,6 @@ use crate::models::deployment_node::PinStatus;
 pub struct CreateDeploymentNodePayload {
     pub deployment_id: String,
     pub node_id: String,
-    pub status: PinStatus,
 }
 
 #[derive(Deserialize, Debug, Iterable)]

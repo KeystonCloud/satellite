@@ -23,7 +23,7 @@ pub enum DeploymentStatus {
     FAILED,
 }
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct Deployment {
     pub id: Uuid,
     pub app_id: Uuid,
@@ -161,8 +161,6 @@ async fn deployment_update_by_id(
 
             query_builder.push(" WHERE id = ").push_bind(uuid);
             query_builder.push(" RETURNING *");
-
-            println!("SQL: {}", query_builder.sql());
 
             let query = query_builder.build_query_as::<Deployment>();
 
