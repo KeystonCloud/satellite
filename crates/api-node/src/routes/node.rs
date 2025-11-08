@@ -22,7 +22,7 @@ pub async fn post(
     println!("[API-Nodes] Registration received.");
 
     let info = NodeInfo {
-        last_seen: Utc::now().timestamp(),
+        last_seen: Some(Utc::now().timestamp()),
     };
     payload.ip = Some(addr.ip().to_string());
 

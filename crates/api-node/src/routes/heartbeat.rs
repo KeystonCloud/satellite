@@ -3,7 +3,7 @@ use chrono::Utc;
 use redis::AsyncTypedCommands;
 use serde::Deserialize;
 
-use crate::models::node::NodeInfo;
+use crate::models::node::{Node, NodeInfo};
 use core::{json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Deserialize, Debug)]
@@ -27,19 +27,8 @@ pub async fn post(
         }
     };
 
-    let node_key = format!("nodes:{}", payload.id);
-    let info_json: String = match conn.get(&node_key).await {
-        Ok(json) => match json {
-            Some(data) => data,
-            None => {
-                return (
-                    StatusCode::NOT_FOUND,
-                    Json(SimpleJsonResponse {
-                        message: format!("Node id={} not found", payload.id),
-                    }),
-                );
-            }
-        },
+    let node = match Node::find_by_id(&state.db_pool, &payload.id).await {
+        Ok(node) => node,
         Err(_) => {
             return (
                 StatusCode::NOT_FOUND,
@@ -50,12 +39,24 @@ pub async fn post(
         }
     };
 
+    let node_key = format!("nodes:{}", node.id);
+    let info_json: String = match conn.get(&node_key).await {
+        Ok(json) => match json {
+            Some(data) => data,
+            None => "{\"last_seen\": null}".to_string(),
+        },
+        Err(_) => "{\"last_seen\": null}".to_string(),
+    };
+
     let info_updated_json = match serde_json::from_str::<NodeInfo>(&info_json) {
         Ok(mut info) => {
-            info.last_seen = Utc::now().timestamp();
+            info.last_seen = Some(Utc::now().timestamp());
             serde_json::to_string(&info).unwrap_or(info_json)
         }
-        Err(_) => info_json,
+        Err(e) => {
+            println!("Info update error: {}", e);
+            info_json
+        }
     };
 
     match conn
@@ -75,11 +76,14 @@ pub async fn post(
                 }),
             )
         }
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(SimpleJsonResponse {
-                message: "Erreur d'écriture Redis".to_string(),
-            }),
-        ),
+        Err(_) => {
+            println!("[API-Nodes] Heartbeat Redis write error");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SimpleJsonResponse {
+                    message: "Redis write error".to_string(),
+                }),
+            )
+        }
     }
 }

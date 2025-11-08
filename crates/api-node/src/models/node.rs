@@ -8,7 +8,7 @@ use core::database::DbPool;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInfo {
-    pub last_seen: i64,
+    pub last_seen: Option<i64>,
 }
 
 #[derive(FromRow, Debug)]
