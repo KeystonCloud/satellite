@@ -3,7 +3,8 @@ use chrono::Utc;
 use redis::AsyncTypedCommands;
 use serde::Deserialize;
 
-use core::{json::SimpleJsonResponse, node::NodeInfo, server::ServerState};
+use crate::models::node::NodeInfo;
+use core::{json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {

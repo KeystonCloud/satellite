@@ -1,19 +1,32 @@
 use chrono::{DateTime, Utc};
-use serde::ser::{Serialize, SerializeStruct};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::payloads::node::{CreateNodePayload, UpdateNodePayload};
 use core::database::DbPool;
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NodeInfo {
+    pub last_seen: i64,
+}
+
 #[derive(FromRow, Debug)]
 pub struct Node {
     pub id: Uuid,
     pub owner_id: Uuid,
     pub name: String,
+    pub ip: String,
+    pub port: i32,
     pub reputation_score: f64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+pub struct NodeData {
+    pub node: Node,
+    pub info: Option<NodeInfo>,
 }
 
 impl Serialize for Node {
@@ -25,6 +38,8 @@ impl Serialize for Node {
         state.serialize_field("id", &self.id.to_string())?;
         state.serialize_field("owner_id", &self.owner_id.to_string())?;
         state.serialize_field("name", &self.name)?;
+        state.serialize_field("ip", &self.ip)?;
+        state.serialize_field("port", &self.port)?;
         state.serialize_field("reputation_score", &self.reputation_score)?;
         state.serialize_field("created_at", &self.created_at.to_string())?;
         state.serialize_field("updated_at", &self.updated_at.to_string())?;
@@ -37,10 +52,12 @@ impl Node {
         match Uuid::parse_str(payload.owner_id.as_str()) {
             Ok(owner_id) => {
                 match sqlx::query_as::<_, Node>(
-                    "INSERT INTO nodes (owner_id, name) VALUES ($1, $2) RETURNING *",
+                    "INSERT INTO nodes (owner_id, name, ip, port) VALUES ($1, $2, $3, $4) RETURNING *",
                 )
                 .bind(owner_id)
                 .bind(payload.name.clone())
+                .bind(payload.ip.clone())
+                .bind(payload.port)
                 .fetch_one(db_pool)
                 .await
                 {

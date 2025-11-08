@@ -21,6 +21,7 @@ dependencies = [
 name = "api-app"
 version = "0.1.0"
 dependencies = [
+ "api-node",
  "axum",
  "chrono",
  "core",

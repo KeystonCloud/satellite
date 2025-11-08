@@ -8,8 +8,9 @@ pub mod routes;
 
 pub fn create_router(state: ServerState) -> Router {
     Router::new()
-        .route("/list", get(routes::list::get))
-        .route("/register", post(routes::register::post))
+        .route("/", get(routes::node::get_all))
+        .route("/{uuid}", get(routes::node::get))
+        .route("/", post(routes::node::post))
         .route("/heartbeat", post(routes::heartbeat::post))
         .with_state(state)
 }
