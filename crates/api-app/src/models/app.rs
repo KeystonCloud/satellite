@@ -6,7 +6,7 @@ use struct_iterable::Iterable;
 use crate::payloads::app::{CreateAppPayload, UpdateAppPayload};
 use core::database::DbPool;
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct App {
     pub id: Uuid,
     pub team_id: Uuid,
