@@ -4,7 +4,7 @@ use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::payloads::app::{CreateAppPayload, UpdateAppPayload};
-use core::database::DbPool;
+use kc_core::database::DbPool;
 
 #[derive(FromRow, Debug, Clone)]
 pub struct App {

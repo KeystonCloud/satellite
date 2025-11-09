@@ -7,7 +7,7 @@ use crate::{
     models::user::User,
     payloads::team::{CreateTeamPayload, UpdateTeamPayload},
 };
-use core::database::DbPool;
+use kc_core::database::DbPool;
 
 #[derive(FromRow, Debug)]
 pub struct Team {

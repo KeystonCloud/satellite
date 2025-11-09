@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-core = { path = "../crates/core" }
+kc-core = { path = "../crates/kc-core" }
 api-user = { path = "../crates/api-user" }
 api-node = { path = "../crates/api-node" }
 api-app = { path = "../crates/api-app" }

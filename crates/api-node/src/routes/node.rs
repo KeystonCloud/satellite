@@ -12,7 +12,7 @@ use crate::{
     models::node::{Node, NodeData, NodeInfo},
     payloads::node::CreateNodePayload,
 };
-use core::{json::DataJsonResponse, server::ServerState};
+use kc_core::{json::DataJsonResponse, server::ServerState};
 
 pub async fn post(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,

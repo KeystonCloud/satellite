@@ -6,15 +6,16 @@ use struct_iterable::Iterable;
 use crate::{
     models::team::Team,
     payloads::user::{CreateUserPayload, LoginPayload, UpdateUserPayload},
+    utils::auth::{hash_password, verify_password},
 };
-use core::database::DbPool;
+use kc_core::database::DbPool;
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub struct User {
     pub id: Uuid,
     pub name: String,
     pub email: String,
-    pub password: Option<String>,
+    pub password: String,
     pub role: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -29,11 +30,6 @@ impl Serialize for User {
         state.serialize_field("id", &self.id.to_string())?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("email", &self.email)?;
-
-        if let Some(password) = &self.password {
-            state.serialize_field("password", password)?;
-        }
-
         state.serialize_field("role", &self.role)?;
         state.serialize_field("created_at", &self.created_at.to_string())?;
         state.serialize_field("updated_at", &self.updated_at.to_string())?;
@@ -43,12 +39,20 @@ impl Serialize for User {
 
 impl User {
     pub async fn create(db_pool: &DbPool, payload: &CreateUserPayload) -> Result<User, String> {
+        let password_hash = match hash_password(payload.password.clone()).await {
+            Ok(hash) => hash,
+            Err(e) => {
+                eprintln!("Error in hashing password: {}", e);
+                return Err("Error in hashing password".to_string());
+            }
+        };
+
         match sqlx::query_as::<_, User>(
             "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
         )
         .bind(payload.name.clone())
         .bind(payload.email.clone())
-        .bind(payload.password.clone())
+        .bind(password_hash)
         .fetch_one(db_pool)
         .await
         {
@@ -64,10 +68,7 @@ impl User {
                     .bind(uuid)
                     .fetch_one(db_pool)
                     .await
-                    .map(|mut user| {
-                        user.password = None;
-                        user
-                    }) {
+                {
                     Ok(result) => Ok(result),
                     Err(e) => Err(e.to_string()),
                 }
@@ -106,10 +107,7 @@ impl User {
 
                 let query = query_builder.build_query_as::<User>();
 
-                match query.fetch_one(db_pool).await.map(|mut user| {
-                    user.password = None;
-                    user
-                }) {
+                match query.fetch_one(db_pool).await {
                     Ok(result) => Ok(result),
                     Err(e) => Err(e.to_string()),
                 }
@@ -125,10 +123,7 @@ impl User {
                     .bind(uuid)
                     .fetch_one(db_pool)
                     .await
-                    .map(|mut user| {
-                        user.password = None;
-                        user
-                    }) {
+                {
                     Ok(result) => Ok(result),
                     Err(e) => Err(e.to_string()),
                 }
@@ -138,17 +133,27 @@ impl User {
     }
 
     pub async fn login(db_pool: &DbPool, payload: &LoginPayload) -> Result<User, String> {
-        match sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1 AND password = $2")
+        match sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
             .bind(payload.email.clone())
-            .bind(payload.password.clone())
             .fetch_one(db_pool)
             .await
-            .map(|mut user| {
-                user.password = None;
-                user
-            }) {
-            Ok(result) => Ok(result),
-            Err(e) => Err(e.to_string()),
+        {
+            Ok(result) => {
+                match verify_password(payload.password.clone(), result.password.clone()).await {
+                    Ok(is_valid) => {
+                        if is_valid {
+                            return Ok(result);
+                        }
+
+                        Err("Invalid credentials".to_string())
+                    }
+                    Err(e) => {
+                        eprintln!("Error in password verification: {}", e);
+                        return Err("Error in password verification".to_string());
+                    }
+                }
+            }
+            Err(e) => Err(format!("User not found: {}", e)),
         }
     }
 

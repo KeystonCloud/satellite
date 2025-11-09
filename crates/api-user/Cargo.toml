@@ -7,8 +7,11 @@ edition = "2024"
 axum = "0.8.6"
 chrono = "0.4.42"
 serde = { version = "1.0.228", features = ["derive"] }
-core = { path = "../core" }
+kc-core = { path = "../kc-core" }
 tokio = { version = "1.48.0", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = [ "runtime-tokio", "postgres", "macros", "chrono", "uuid" ] }
 struct_iterable = "0.1.1"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+argon2 = "0.5"
+password-hash = { version = "0.5", features = ["std"] }
+thiserror = "2"

@@ -8,7 +8,7 @@ use sqlx::{
 use struct_iterable::Iterable;
 
 use crate::payloads::deployment::{CreateDeploymentPayload, UpdateDeploymentPayload};
-use core::database::DbPool;
+use kc_core::database::DbPool;
 
 #[derive(Debug, Type, Serialize, Deserialize, Clone, Copy)]
 #[sqlx(type_name = "deployment_status")]

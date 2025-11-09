@@ -24,7 +24,7 @@ dependencies = [
  "api-node",
  "axum",
  "chrono",
- "core",
+ "kc-core",
  "redis",
  "reqwest",
  "serde",
@@ -40,7 +40,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
- "core",
+ "kc-core",
  "redis",
  "serde",
  "serde_json",
@@ -52,14 +52,29 @@ dependencies = [
 name = "api-user"
 version = "0.1.0"
 dependencies = [
+ "argon2",
  "axum",
  "chrono",
- "core",
  "jsonwebtoken",
+ "kc-core",
+ "password-hash",
  "serde",
  "sqlx",
  "struct_iterable",
+ "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "argon2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
+dependencies = [
+ "base64ct",
+ "blake2",
+ "cpufeatures",
+ "password-hash",
 ]
 
 [[package]]
@@ -208,6 +223,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
+dependencies = [
+ "digest",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -339,21 +363,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
 dependencies = [
  "unicode-segmentation",
-]
-
-[[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-extra",
- "chrono",
- "config",
- "jsonwebtoken",
- "redis",
- "serde",
- "sqlx",
- "tokio",
 ]
 
 [[package]]
@@ -820,7 +829,7 @@ dependencies = [
  "api-node",
  "api-user",
  "axum",
- "core",
+ "kc-core",
  "redis",
  "tokio",
  "web-server",
@@ -1315,6 +1324,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "kc-core"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-extra",
+ "chrono",
+ "config",
+ "jsonwebtoken",
+ "redis",
+ "serde",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1622,6 +1646,17 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -3115,7 +3150,7 @@ version = "0.1.0"
 dependencies = [
  "api-app",
  "axum",
- "core",
+ "kc-core",
  "reqwest",
  "serde_json",
 ]

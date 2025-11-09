@@ -4,7 +4,7 @@ use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::payloads::node::{CreateNodePayload, UpdateNodePayload};
-use core::database::DbPool;
+use kc_core::database::DbPool;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInfo {

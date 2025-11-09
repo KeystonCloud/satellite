@@ -4,7 +4,7 @@ use redis::AsyncTypedCommands;
 use serde::Deserialize;
 
 use crate::models::node::{Node, NodeInfo};
-use core::{json::SimpleJsonResponse, server::ServerState};
+use kc_core::{json::SimpleJsonResponse, server::ServerState};
 
 #[derive(Deserialize, Debug)]
 pub struct HeartbeatPayload {

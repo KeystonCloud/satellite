@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "gateway",
-    "crates/core",
+    "crates/kc-core",
     "crates/api-user",
     "crates/api-node",
     "crates/api-app",

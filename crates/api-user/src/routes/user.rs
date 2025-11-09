@@ -14,7 +14,7 @@ use crate::{
         user::{CreateUserPayload, LoginPayload, UpdateUserPayload},
     },
 };
-use core::{authentication, json::DataJsonResponse, server::ServerState};
+use kc_core::{authentication, json::DataJsonResponse, server::ServerState};
 
 pub async fn create(
     State(state): State<ServerState>,
@@ -83,15 +83,8 @@ pub async fn get_all(
     match sqlx::query_as::<_, User>("SELECT * FROM users")
         .fetch_all(&state.db_pool)
         .await
-        .map(|results| {
-            results
-                .into_iter()
-                .map(|mut user| {
-                    user.password = None;
-                    user
-                })
-                .collect::<Vec<User>>()
-        }) {
+        .map(|results| results.into_iter().collect::<Vec<User>>())
+    {
         Ok(results) => (
             StatusCode::OK,
             Json(DataJsonResponse {
@@ -267,13 +260,16 @@ pub async fn login(
                 ),
             }
         }
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            Json(DataJsonResponse {
-                error: Some("User not found".to_string()),
-                data: None,
-            }),
-        ),
+        Err(e) => {
+            eprintln!("{}", e);
+            (
+                StatusCode::NOT_FOUND,
+                Json(DataJsonResponse {
+                    error: Some("User not found".to_string()),
+                    data: None,
+                }),
+            )
+        }
     }
 }
 

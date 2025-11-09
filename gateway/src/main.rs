@@ -1,5 +1,5 @@
 use axum::{Router, routing::get};
-use core::{database::create_db_pool, server::ServerSettings, server::ServerState};
+use kc_core::{database::create_db_pool, server::ServerSettings, server::ServerState};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};

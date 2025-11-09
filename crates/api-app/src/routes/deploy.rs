@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 use api_node::models::node::Node;
-use core::{database::DbPool, json::DataJsonResponse, server::ServerState};
+use kc_core::{database::DbPool, json::DataJsonResponse, server::ServerState};
 use std::collections::HashMap;
 
 use crate::{
