@@ -29,7 +29,7 @@ pub async fn create(
             match Team::create(&state.db_pool, &user_team).await {
                 Ok(team) => match team.associate_user(&state.db_pool, &user).await {
                     Ok(_) => (
-                        StatusCode::OK,
+                        StatusCode::CREATED,
                         Json(DataJsonResponse {
                             data: Some(user),
                             error: None,

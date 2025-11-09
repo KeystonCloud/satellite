@@ -59,6 +59,22 @@ impl Team {
         }
     }
 
+    pub async fn find_by_user_id(db_pool: &DbPool, id: &String) -> Result<Vec<Team>, String> {
+        match Uuid::parse_str(id) {
+            Ok(uuid) => {
+                match sqlx::query_as::<_, Team>("SELECT * FROM teams JOIN team_users ON team_users.team_id = teams.id WHERE team_users.user_id = $1")
+                    .bind(uuid)
+                    .fetch_all(db_pool)
+                    .await
+                {
+                    Ok(results) => Ok(results),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+            Err(e) => Err(format!("Invalid UUID format: {}", e)),
+        }
+    }
+
     pub async fn update_by_id(
         db_pool: &DbPool,
         id: &String,
@@ -118,6 +134,22 @@ impl Team {
         match sqlx::query("INSERT INTO team_users (team_id, user_id) VALUES ($1, $2)")
             .bind(self.id)
             .bind(user.id)
+            .execute(db_pool)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    pub async fn associate_user_by_id(
+        &self,
+        db_pool: &DbPool,
+        user_id: &String,
+    ) -> Result<(), String> {
+        match sqlx::query("INSERT INTO team_users (team_id, user_id) VALUES ($1, $2)")
+            .bind(self.id)
+            .bind(user_id)
             .execute(db_pool)
             .await
         {
