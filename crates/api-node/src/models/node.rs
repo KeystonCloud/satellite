@@ -85,6 +85,22 @@ impl Node {
         }
     }
 
+    pub async fn find_by_user_id(db_pool: &DbPool, id: &String) -> Result<Vec<Node>, String> {
+        match Uuid::parse_str(id) {
+            Ok(uuid) => {
+                match sqlx::query_as::<_, Node>("SELECT nodes.* FROM nodes JOIN teams ON teams.id = nodes.owner_id JOIN team_users ON team_users.team_id = teams.id WHERE team_users.user_id = $1")
+                    .bind(uuid)
+                    .fetch_all(db_pool)
+                    .await
+                {
+                    Ok(result) => Ok(result),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+            Err(e) => Err(format!("Invalid UUID format: {}", e)),
+        }
+    }
+
     pub async fn update_by_id(
         db_pool: &DbPool,
         id: &String,

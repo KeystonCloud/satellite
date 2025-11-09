@@ -12,7 +12,7 @@ use crate::{
     models::node::{Node, NodeData, NodeInfo},
     payloads::node::CreateNodePayload,
 };
-use kc_core::{json::DataJsonResponse, server::ServerState};
+use kc_core::{authentication, json::DataJsonResponse, server::ServerState};
 
 pub async fn post(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -114,6 +114,31 @@ pub async fn get_all(State(state): State<ServerState>) -> impl IntoResponse {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(DataJsonResponse {
                     error: Some("Error fetching nodes from DB".to_string()),
+                    data: None,
+                }),
+            );
+        }
+    }
+}
+
+pub async fn get_mine(
+    State(state): State<ServerState>,
+    authenticated_claims: authentication::Claims,
+) -> impl IntoResponse {
+    match Node::find_by_user_id(&state.db_pool, &authenticated_claims.user_id).await {
+        Ok(nodes) => (
+            StatusCode::OK,
+            Json(DataJsonResponse {
+                data: Some(nodes),
+                error: None,
+            }),
+        ),
+        Err(e) => {
+            println!("[API-Nodes] Nodes not found: {}", e);
+            return (
+                StatusCode::NOT_FOUND,
+                Json(DataJsonResponse {
+                    error: Some("Nodes not found".to_string()),
                     data: None,
                 }),
             );
