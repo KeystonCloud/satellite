@@ -8,7 +8,6 @@ pub async fn get_mine(
     State(state): State<ServerState>,
     authenticated_claims: authentication::Claims,
 ) -> impl IntoResponse {
-    println!("Coucou");
     match App::find_by_user_id(&state.db_pool, &authenticated_claims.user_id).await {
         Ok(nodes) => (
             StatusCode::OK,
