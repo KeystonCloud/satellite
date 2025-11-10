@@ -139,7 +139,7 @@ pub async fn update(
     State(state): State<ServerState>,
     Path(uuid): Path<String>,
     authenticated_claims: authentication::Claims,
-    Json(payload): Json<UpdateUserPayload>,
+    Json(mut payload): Json<UpdateUserPayload>,
 ) -> impl IntoResponse {
     match Uuid::parse_str(&uuid) {
         Ok(uuid) => {
@@ -155,7 +155,7 @@ pub async fn update(
                 );
             }
 
-            match User::update_by_id(&state.db_pool, &uuid.to_string(), &payload).await {
+            match User::update_by_id(&state.db_pool, &uuid.to_string(), &mut payload).await {
                 Ok(user) => (
                     StatusCode::OK,
                     Json(DataJsonResponse {
@@ -298,9 +298,9 @@ pub async fn get_me(
 pub async fn update_me(
     State(state): State<ServerState>,
     authenticated_claims: authentication::Claims,
-    Json(payload): Json<UpdateUserPayload>,
+    Json(mut payload): Json<UpdateUserPayload>,
 ) -> impl IntoResponse {
-    match User::update_by_id(&state.db_pool, &authenticated_claims.user_id, &payload).await {
+    match User::update_by_id(&state.db_pool, &authenticated_claims.user_id, &mut payload).await {
         Ok(user) => (
             StatusCode::OK,
             Json(DataJsonResponse {

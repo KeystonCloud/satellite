@@ -80,10 +80,40 @@ impl User {
     pub async fn update_by_id(
         db_pool: &DbPool,
         id: &String,
-        payload: &UpdateUserPayload,
+        payload: &mut UpdateUserPayload,
     ) -> Result<User, String> {
         match Uuid::parse_str(id) {
             Ok(uuid) => {
+                if let (Some(new_password), Some(pass)) = (&payload.new_password, &payload.password)
+                {
+                    let user = match User::find_by_id(db_pool, id).await {
+                        Ok(u) => u,
+                        Err(e) => return Err(format!("User not found: {}", e)),
+                    };
+
+                    match verify_password(pass.to_string(), user.password).await {
+                        Ok(is_valid) => {
+                            if !is_valid {
+                                return Err("Current password is incorrect".to_string());
+                            }
+
+                            payload.password = match hash_password(new_password.to_string()).await {
+                                Ok(hash) => Some(hash),
+                                Err(e) => {
+                                    eprintln!("Error in hashing new password: {}", e);
+                                    return Err("Error in hashing new password".to_string());
+                                }
+                            };
+
+                            payload.new_password = None;
+                        }
+                        Err(e) => {
+                            eprintln!("Error in password verification: {}", e);
+                            return Err("Error in password verification".to_string());
+                        }
+                    }
+                }
+
                 let mut query_builder = QueryBuilder::new("UPDATE users");
 
                 let mut i = 0;

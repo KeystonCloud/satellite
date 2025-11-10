@@ -8,11 +8,12 @@ pub struct CreateUserPayload {
     pub password: String,
 }
 
-#[derive(Deserialize, Debug, Iterable)]
+#[derive(Deserialize, Debug, Clone, Iterable)]
 pub struct UpdateUserPayload {
     pub name: Option<String>,
     pub email: Option<String>,
     pub password: Option<String>,
+    pub new_password: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
