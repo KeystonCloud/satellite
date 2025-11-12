@@ -5,11 +5,12 @@ IPFS_DIR=/root/.ipfs
 if [ ! -f $IPFS_DIR/config ]; then
   echo "[Satellite] Initialisation d'IPFS..."
   ipfs init
-
-  ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001 --json
-  ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080 --json
-  ipfs config Addresses.Swarm '["/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"]' --json
 fi
+
+echo "[Satellite] Configuration des adresses API, Swarm et Gateway..."
+ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
+ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
+ipfs config Addresses.Swarm '["/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"]' --json
 
 echo "[Satellite] Lancement du daemon IPFS..."
 ipfs daemon &

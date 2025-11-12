@@ -50,7 +50,9 @@ If you want to use docker compose for development, you can add into ``services``
       - ./satellite:/app
       - ipfs-satellite-data:/root/.ipfs
     ports:
-      - 8000:8000
+      - 8000:8000 # KeystonCloud API
+      - 8080:8080 # IPFS Gateway
+      - 4001:4001 # IPFS Swarm
     depends_on:
       - postgres
       - redis
