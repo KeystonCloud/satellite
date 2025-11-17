@@ -22,13 +22,8 @@ impl Query {
 
         let claims = match ctx.data::<Claims>() {
             Ok(claims) => claims,
-            Err(e) => {
-                println!("{:?}", e);
-                return Err("User not connected".to_string());
-            }
+            Err(_) => return Err("User not connected".to_string()),
         };
-
-        println!("Claims: {:?}", claims);
 
         match Uuid::parse_str(&claims.user_id) {
             Ok(uuid) => {
@@ -38,6 +33,37 @@ impl Query {
                     .await
                 {
                     Ok(result) => Ok(result),
+                    Err(e) => Err(e.to_string()),
+                }
+            }
+            Err(e) => Err(format!("Invalid UUID format: {}", e)),
+        }
+    }
+
+    async fn user(&self, ctx: &Context<'_>, id: String) -> Result<User, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => return Err("Failed to get server state".to_string()),
+        };
+
+        let claims = match ctx.data::<Claims>() {
+            Ok(claims) => claims,
+            Err(_) => return Err("User not connected".to_string()),
+        };
+
+        if claims.role != "admin" {
+            return Err("You do not have permission to perform this action.".to_string());
+        }
+
+        match Uuid::parse_str(&id) {
+            Ok(uuid) => {
+                match sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+                    .bind(uuid)
+                    .fetch_one(&state.db_pool)
+                    .await
+                {
+                    Ok(result) => Ok(result),
+                    Err(sqlx::Error::RowNotFound) => Err(format!("User with id {} not found", id)),
                     Err(e) => Err(e.to_string()),
                 }
             }
