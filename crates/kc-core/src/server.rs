@@ -3,6 +3,7 @@ use serde::Deserialize;
 use crate::{
     app::AppRegistry,
     database::{DatabaseConfig, DbPool},
+    models::query::AppSchema,
     node::NodeHealthConfig,
     redis::{RedisClient, RedisSettings},
 };
@@ -13,6 +14,7 @@ pub struct ServerState {
     pub app_registry: AppRegistry,
     pub db_pool: DbPool,
     pub redis_client: RedisClient,
+    pub graphql_schema: AppSchema,
 }
 
 #[derive(Debug, Deserialize, Clone)]

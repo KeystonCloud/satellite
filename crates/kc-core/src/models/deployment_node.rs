@@ -7,76 +7,83 @@ use sqlx::{
 };
 use struct_iterable::Iterable;
 
-use crate::payloads::deployment::{CreateDeploymentPayload, UpdateDeploymentPayload};
-use kc_core::database::DbPool;
+use crate::{
+    database::DbPool,
+    payloads::deployment_node::{CreateDeploymentNodePayload, UpdateDeploymentNodePayload},
+};
 
 #[derive(Debug, Type, Serialize, Deserialize, Clone, Copy)]
-#[sqlx(type_name = "deployment_status")]
-pub enum DeploymentStatus {
-    #[sqlx(rename = "PENDING")]
-    PENDING,
-    #[sqlx(rename = "PUBLISHING")]
-    PUBLISHING,
-    #[sqlx(rename = "DEPLOYED")]
-    DEPLOYED,
+#[sqlx(type_name = "pin_status")]
+pub enum PinStatus {
+    #[sqlx(rename = "PINNING")]
+    PINNING,
+    #[sqlx(rename = "PINNED")]
+    PINNED,
     #[sqlx(rename = "FAILED")]
     FAILED,
 }
 
-#[derive(FromRow, Debug, Clone)]
-pub struct Deployment {
+#[derive(FromRow, Debug)]
+pub struct DeploymentNode {
     pub id: Uuid,
-    pub app_id: Uuid,
-    pub cid: String,
-    pub status: DeploymentStatus,
+    pub deployment_id: Uuid,
+    pub node_id: Uuid,
+    pub status: PinStatus,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-impl Serialize for Deployment {
+impl Serialize for DeploymentNode {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("Deployment", 5)?;
+        let mut state = serializer.serialize_struct("DeploymentNode", 5)?;
         state.serialize_field("id", &self.id.to_string())?;
-        state.serialize_field("app_id", &self.app_id.to_string())?;
-        state.serialize_field("cid", &self.cid)?;
+        state.serialize_field("deployment_id", &self.deployment_id.to_string())?;
+        state.serialize_field("node_id", &self.node_id.to_string())?;
         state.serialize_field("status", &self.status)?;
         state.serialize_field("created_at", &self.created_at.to_string())?;
+        state.serialize_field("updated_at", &self.updated_at.to_string())?;
         state.end()
     }
 }
 
-impl Deployment {
+impl DeploymentNode {
     pub async fn create(
         db_pool: &DbPool,
-        payload: &CreateDeploymentPayload,
-    ) -> Result<Deployment, String> {
-        match Uuid::parse_str(&payload.app_id) {
-            Ok(app_id) => {
-                match sqlx::query_as::<_, Deployment>(
-                    "INSERT INTO deployments (app_id, cid) VALUES ($1, $2) RETURNING *",
-                )
-                .bind(app_id)
-                .bind(payload.cid.clone())
-                .fetch_one(db_pool)
-                .await
-                {
-                    Ok(result) => Ok(result),
-                    Err(e) => Err(e.to_string()),
+        payload: &CreateDeploymentNodePayload,
+    ) -> Result<DeploymentNode, String> {
+        match Uuid::parse_str(&payload.deployment_id) {
+            Ok(deployment_uuid) => match Uuid::parse_str(&payload.node_id) {
+                Ok(node_uuid) => {
+                    return match sqlx::query_as::<_, DeploymentNode>(
+                        "INSERT INTO deployments_nodes (deployment_id, node_id) VALUES ($1, $2) RETURNING *",
+                    )
+                    .bind(deployment_uuid)
+                    .bind(node_uuid)
+                    .fetch_one(db_pool)
+                    .await
+                    {
+                        Ok(result) => Ok(result),
+                        Err(e) => Err(e.to_string()),
+                    };
                 }
-            }
-            Err(e) => Err(format!("Invalid UUID format for app_id: {}", e)),
+                Err(e) => return Err(format!("Invalid node_id UUID format: {}", e)),
+            },
+            Err(e) => return Err(format!("Invalid deployment_id UUID format: {}", e)),
         }
     }
 
-    pub async fn find_by_id(db_pool: &DbPool, id: &String) -> Result<Deployment, String> {
+    pub async fn find_by_id(db_pool: &DbPool, id: &String) -> Result<DeploymentNode, String> {
         match Uuid::parse_str(id) {
             Ok(uuid) => {
-                match sqlx::query_as::<_, Deployment>("SELECT * FROM deployments WHERE id = $1")
-                    .bind(uuid)
-                    .fetch_one(db_pool)
-                    .await
+                match sqlx::query_as::<_, DeploymentNode>(
+                    "SELECT * FROM deployments_nodes WHERE id = $1",
+                )
+                .bind(uuid)
+                .fetch_one(db_pool)
+                .await
                 {
                     Ok(result) => Ok(result),
                     Err(e) => Err(e.to_string()),
@@ -89,24 +96,24 @@ impl Deployment {
     pub async fn update_by_id(
         db_pool: &DbPool,
         id: &String,
-        payload: &UpdateDeploymentPayload,
-    ) -> Result<Deployment, String> {
-        deployment_update_by_id(db_pool, id, payload).await
+        payload: &UpdateDeploymentNodePayload,
+    ) -> Result<DeploymentNode, String> {
+        deployment_node_update_by_id(db_pool, id, payload).await
     }
 
     pub async fn update(
         &self,
         db_pool: &DbPool,
-        payload: &UpdateDeploymentPayload,
-    ) -> Result<Deployment, String> {
-        deployment_update_by_id(db_pool, &self.id.to_string(), payload).await
+        payload: &UpdateDeploymentNodePayload,
+    ) -> Result<DeploymentNode, String> {
+        deployment_node_update_by_id(db_pool, &self.id.to_string(), payload).await
     }
 
-    pub async fn delete_by_id(db_pool: &DbPool, id: &String) -> Result<Deployment, String> {
+    pub async fn delete_by_id(db_pool: &DbPool, id: &String) -> Result<DeploymentNode, String> {
         match Uuid::parse_str(id) {
             Ok(uuid) => {
-                match sqlx::query_as::<_, Deployment>(
-                    "DELETE FROM deployments WHERE id = $1 RETURNING *",
+                match sqlx::query_as::<_, DeploymentNode>(
+                    "DELETE FROM deployments_nodes WHERE id = $1 RETURNING *",
                 )
                 .bind(uuid)
                 .fetch_one(db_pool)
@@ -121,14 +128,14 @@ impl Deployment {
     }
 }
 
-async fn deployment_update_by_id(
+async fn deployment_node_update_by_id(
     db_pool: &DbPool,
     id: &String,
-    payload: &UpdateDeploymentPayload,
-) -> Result<Deployment, String> {
+    payload: &UpdateDeploymentNodePayload,
+) -> Result<DeploymentNode, String> {
     match Uuid::parse_str(id) {
         Ok(uuid) => {
-            let mut query_builder = QueryBuilder::new("UPDATE deployments");
+            let mut query_builder = QueryBuilder::new("UPDATE deployments_nodes");
 
             let mut i = 0;
             for (name, field_value) in payload.iter() {
@@ -144,8 +151,7 @@ async fn deployment_update_by_id(
                         i += 1;
                     }
                 }
-
-                if let Some(value) = field_value.downcast_ref::<Option<DeploymentStatus>>() {
+                if let Some(value) = field_value.downcast_ref::<Option<PinStatus>>() {
                     if let Some(v) = value {
                         if i == 0 {
                             query_builder.push(" SET ");
@@ -162,7 +168,7 @@ async fn deployment_update_by_id(
             query_builder.push(" WHERE id = ").push_bind(uuid);
             query_builder.push(" RETURNING *");
 
-            let query = query_builder.build_query_as::<Deployment>();
+            let query = query_builder.build_query_as::<DeploymentNode>();
 
             match query.fetch_one(db_pool).await {
                 Ok(result) => Ok(result),

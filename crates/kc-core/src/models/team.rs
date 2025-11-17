@@ -1,13 +1,15 @@
+use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::ser::{Serialize, SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::{
-    models::user::User,
+    database::DbPool,
+    models::{app::App, node::Node, user::User},
     payloads::team::{CreateTeamPayload, UpdateTeamPayload},
+    server::ServerState,
 };
-use kc_core::database::DbPool;
 
 #[derive(FromRow, Debug)]
 pub struct Team {
@@ -154,6 +156,72 @@ impl Team {
             .await
         {
             Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[Object]
+impl Team {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+    async fn name(&self) -> &str {
+        &self.name
+    }
+
+    async fn users(&self, ctx: &Context<'_>) -> Result<Vec<User>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, User>(
+            "SELECT u.* FROM users u JOIN team_users tu ON u.id = tu.user_id WHERE tu.team_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn nodes(&self, ctx: &Context<'_>) -> Result<Vec<Node>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Node>("SELECT * FROM nodes WHERE owner_id = $1")
+            .bind(self.id)
+            .fetch_all(&state.db_pool)
+            .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn apps(&self, ctx: &Context<'_>) -> Result<Vec<App>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, App>("SELECT * FROM apps WHERE team_id = $1")
+            .bind(self.id)
+            .fetch_all(&state.db_pool)
+            .await
+        {
+            Ok(results) => Ok(results),
             Err(e) => Err(e.to_string()),
         }
     }

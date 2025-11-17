@@ -1,17 +1,20 @@
+use async_graphql::SimpleObject;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
-use crate::payloads::node::{CreateNodePayload, UpdateNodePayload};
-use kc_core::database::DbPool;
+use crate::{
+    database::DbPool,
+    payloads::node::{CreateNodePayload, UpdateNodePayload},
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NodeInfo {
     pub last_seen: Option<i64>,
 }
 
-#[derive(FromRow, Debug)]
+#[derive(FromRow, Debug, SimpleObject)]
 pub struct Node {
     pub id: Uuid,
     pub owner_id: Uuid,

@@ -1,14 +1,16 @@
+use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::ser::{Serialize, SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
 use crate::{
+    database::DbPool,
     models::team::Team,
     payloads::user::{CreateUserPayload, LoginPayload, UpdateUserPayload},
+    server::ServerState,
     utils::auth::{hash_password, verify_password},
 };
-use kc_core::database::DbPool;
 
 #[derive(FromRow, Debug, Clone)]
 pub struct User {
@@ -42,7 +44,7 @@ impl User {
         let password_hash = match hash_password(payload.password.clone()).await {
             Ok(hash) => hash,
             Err(e) => {
-                eprintln!("Error in hashing password: {}", e);
+                eprintln!("Error in hashing password: {:?}", e);
                 return Err("Error in hashing password".to_string());
             }
         };
@@ -100,7 +102,7 @@ impl User {
                             payload.password = match hash_password(new_password.to_string()).await {
                                 Ok(hash) => Some(hash),
                                 Err(e) => {
-                                    eprintln!("Error in hashing new password: {}", e);
+                                    eprintln!("Error in hashing new password: {:?}", e);
                                     return Err("Error in hashing new password".to_string());
                                 }
                             };
@@ -108,7 +110,7 @@ impl User {
                             payload.new_password = None;
                         }
                         Err(e) => {
-                            eprintln!("Error in password verification: {}", e);
+                            eprintln!("Error in password verification: {:?}", e);
                             return Err("Error in password verification".to_string());
                         }
                     }
@@ -178,7 +180,7 @@ impl User {
                         Err("Invalid credentials".to_string())
                     }
                     Err(e) => {
-                        eprintln!("Error in password verification: {}", e);
+                        eprintln!("Error in password verification: {:?}", e);
                         return Err("Error in password verification".to_string());
                     }
                 }
@@ -195,6 +197,48 @@ impl User {
             .await
         {
             Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+#[Object]
+impl User {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+    async fn name(&self) -> &str {
+        &self.name
+    }
+    async fn email(&self) -> &str {
+        &self.email
+    }
+    async fn role(&self) -> &str {
+        &self.role
+    }
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+    async fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    async fn teams(&self, ctx: &Context<'_>) -> Result<Vec<Team>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Team>(
+            "SELECT t.* FROM teams t JOIN team_users tu ON t.id = tu.team_id WHERE tu.user_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
             Err(e) => Err(e.to_string()),
         }
     }

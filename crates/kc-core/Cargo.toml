@@ -9,7 +9,13 @@ config = "0.15.18"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = "1.48.0"
 sqlx = { version = "0.8", default-features = false, features = [ "runtime-tokio", "postgres" ] }
+struct_iterable = "0.1.1"
+argon2 = "0.5"
+password-hash = { version = "0.5", features = ["std"] }
+thiserror = "2"
 axum = "0.8.6"
 axum-extra = { version = "0.12", features = ["typed-header"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 redis = { version = "0.32", features = ["tokio-comp", "cluster-async", "json"] }
+async-graphql = "7.0.17"
+async-graphql-axum = "7.0.17"

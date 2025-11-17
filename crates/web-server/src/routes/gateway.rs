@@ -1,11 +1,10 @@
-use api_app::models::app::App;
 use axum::{
     body::Body,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use kc_core::server::ServerState;
+use kc_core::{models::app::App, server::ServerState};
 use reqwest::Client;
 
 pub async fn web_handler(

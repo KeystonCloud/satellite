@@ -1,12 +1,15 @@
+use async_graphql::SimpleObject;
 use chrono::{DateTime, Utc};
 use serde::ser::{Serialize, SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
 use struct_iterable::Iterable;
 
-use crate::payloads::app::{CreateAppPayload, UpdateAppPayload};
-use kc_core::database::DbPool;
+use crate::{
+    database::DbPool,
+    payloads::app::{CreateAppPayload, UpdateAppPayload},
+};
 
-#[derive(FromRow, Debug, Clone)]
+#[derive(FromRow, Debug, Clone, SimpleObject)]
 pub struct App {
     pub id: Uuid,
     pub team_id: Uuid,
