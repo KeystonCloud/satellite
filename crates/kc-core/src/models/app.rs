@@ -1,4 +1,4 @@
-use async_graphql::SimpleObject;
+use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::ser::{Serialize, SerializeStruct};
 use sqlx::{QueryBuilder, prelude::FromRow, types::Uuid};
@@ -6,10 +6,12 @@ use struct_iterable::Iterable;
 
 use crate::{
     database::DbPool,
+    models::{deployment::Deployment, node::Node, team::Team},
     payloads::app::{CreateAppPayload, UpdateAppPayload},
+    server::ServerState,
 };
 
-#[derive(FromRow, Debug, Clone, SimpleObject)]
+#[derive(FromRow, Debug, Clone)]
 pub struct App {
     pub id: Uuid,
     pub team_id: Uuid,
@@ -169,5 +171,89 @@ async fn app_update_by_id(
             }
         }
         Err(e) => Err(format!("Invalid UUID format: {}", e)),
+    }
+}
+
+#[Object]
+impl App {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+    async fn name(&self) -> &str {
+        &self.name
+    }
+    async fn key_name(&self) -> &str {
+        match &self.key_name {
+            Some(name) => name,
+            None => "",
+        }
+    }
+    async fn ipns_name(&self) -> &str {
+        match &self.ipns_name {
+            Some(name) => name,
+            None => "",
+        }
+    }
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+    async fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+
+    async fn team(&self, ctx: &Context<'_>) -> Result<Team, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Team>("SELECT t.* FROM teams t WHERE t.id = $1")
+            .bind(self.team_id)
+            .fetch_one(&state.db_pool)
+            .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn deployments(&self, ctx: &Context<'_>) -> Result<Vec<Deployment>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Deployment>("SELECT d.* FROM deployments d WHERE d.app_id = $1")
+            .bind(self.id)
+            .fetch_all(&state.db_pool)
+            .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn nodes(&self, ctx: &Context<'_>) -> Result<Vec<Node>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Node>(
+            "SELECT n.* FROM deployments_nodes dn JOIN nodes n ON dn.node_id = n.id JOIN deployments d ON dn.deployment_id = d.id WHERE d.app_id = $1 GROUP BY n.id",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }

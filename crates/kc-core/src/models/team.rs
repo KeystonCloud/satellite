@@ -169,6 +169,12 @@ impl Team {
     async fn name(&self) -> &str {
         &self.name
     }
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+    async fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
 
     async fn users(&self, ctx: &Context<'_>) -> Result<Vec<User>, String> {
         let state = match ctx.data::<ServerState>() {

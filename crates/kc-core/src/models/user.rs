@@ -6,7 +6,7 @@ use struct_iterable::Iterable;
 
 use crate::{
     database::DbPool,
-    models::team::Team,
+    models::{app::App, node::Node, team::Team},
     payloads::user::{CreateUserPayload, LoginPayload, UpdateUserPayload},
     server::ServerState,
     utils::auth::{hash_password, verify_password},
@@ -233,6 +233,46 @@ impl User {
 
         match sqlx::query_as::<_, Team>(
             "SELECT t.* FROM teams t JOIN team_users tu ON t.id = tu.team_id WHERE tu.user_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn nodes(&self, ctx: &Context<'_>) -> Result<Vec<Node>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Node>(
+            "SELECT n.* FROM team_users tu JOIN nodes n ON n.owner_id = tu.team_id WHERE tu.user_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn apps(&self, ctx: &Context<'_>) -> Result<Vec<App>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, App>(
+            "SELECT a.* FROM team_users tu JOIN apps a ON a.team_id = tu.team_id WHERE tu.user_id = $1",
         )
         .bind(self.id)
         .fetch_all(&state.db_pool)

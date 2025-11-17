@@ -1,3 +1,4 @@
+use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use sqlx::{
@@ -9,7 +10,9 @@ use struct_iterable::Iterable;
 
 use crate::{
     database::DbPool,
+    models::{app::App, node::Node},
     payloads::deployment::{CreateDeploymentPayload, UpdateDeploymentPayload},
+    server::ServerState,
 };
 
 #[derive(Debug, Type, Serialize, Deserialize, Clone, Copy)]
@@ -172,5 +175,66 @@ async fn deployment_update_by_id(
             }
         }
         Err(e) => Err(format!("Invalid UUID format: {}", e)),
+    }
+}
+
+#[Object]
+impl Deployment {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+    async fn cid(&self) -> &str {
+        &self.cid
+    }
+    async fn status(&self) -> &str {
+        match self.status {
+            DeploymentStatus::PENDING => "PENDING",
+            DeploymentStatus::PUBLISHING => "PUBLISHING",
+            DeploymentStatus::DEPLOYED => "DEPLOYED",
+            DeploymentStatus::FAILED => "FAILED",
+        }
+    }
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    async fn app(&self, ctx: &Context<'_>) -> Result<App, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, App>(
+            "SELECT a.* FROM deployments d JOIN apps a ON d.app_id = a.id WHERE d.id = $1",
+        )
+        .bind(self.id)
+        .fetch_one(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn nodes(&self, ctx: &Context<'_>) -> Result<Vec<Node>, String> {
+        let state = match ctx.data::<ServerState>() {
+            Ok(state) => state,
+            Err(_) => {
+                return Err("Failed to get server state".to_string());
+            }
+        };
+
+        match sqlx::query_as::<_, Node>(
+            "SELECT n.* FROM deployments_nodes dn JOIN nodes n ON dn.node_id = n.id WHERE dn.deployment_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&state.db_pool)
+        .await
+        {
+            Ok(results) => Ok(results),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }
