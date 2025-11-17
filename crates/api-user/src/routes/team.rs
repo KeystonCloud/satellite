@@ -126,9 +126,7 @@ pub async fn update(
 ) -> impl IntoResponse {
     match Uuid::parse_str(&uuid) {
         Ok(uuid) => {
-            if !(authenticated_claims.role == "admin"
-                || authenticated_claims.user_id == uuid.to_string())
-            {
+            if !(authenticated_claims.role == "admin") {
                 return (
                     StatusCode::FORBIDDEN,
                     Json(DataJsonResponse {
