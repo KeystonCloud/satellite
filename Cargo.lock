@@ -40,16 +40,11 @@ dependencies = [
 name = "api-app"
 version = "0.1.0"
 dependencies = [
- "api-node",
  "axum",
- "chrono",
  "kc-core",
- "redis",
  "reqwest",
  "serde",
- "serde_json",
  "sqlx",
- "struct_iterable",
  "tokio",
 ]
 
@@ -61,7 +56,6 @@ dependencies = [
  "async-graphql-axum",
  "axum",
  "kc-core",
- "serde",
 ]
 
 [[package]]
@@ -75,21 +69,17 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "struct_iterable",
 ]
 
 [[package]]
 name = "api-user"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "axum",
  "chrono",
  "jsonwebtoken",
  "kc-core",
- "serde",
  "sqlx",
- "tokio",
 ]
 
 [[package]]
@@ -1053,8 +1043,6 @@ dependencies = [
  "api-user",
  "axum",
  "kc-core",
- "redis",
- "sqlx",
  "tokio",
  "web-server",
 ]
@@ -1575,7 +1563,6 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "async-graphql",
- "async-graphql-axum",
  "axum",
  "axum-extra",
  "chrono",
