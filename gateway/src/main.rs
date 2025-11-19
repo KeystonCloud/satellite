@@ -1,14 +1,5 @@
-use async_graphql::http::GraphiQLSource;
-use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{
-    Router,
-    extract::{FromRequestParts, State},
-    http::request::Parts,
-    response::{Html, IntoResponse},
-    routing::{get, post},
-};
+use axum::{Router, routing::get};
 use kc_core::{
-    authentication::Claims,
     database::create_db_pool,
     models::query::build_schema,
     server::{ServerSettings, ServerState},
@@ -51,8 +42,7 @@ async fn main() {
         .nest("/api/team", api_user::create_team_router())
         .nest("/api/node", api_node::create_router())
         .nest("/api/app", api_app::create_router())
-        .route("/graphiql", get(graphiql_handler))
-        .route("/graphql", post(graphql_handler))
+        .nest("/api", api_graphql::create_router())
         .merge(web_server::create_router())
         .with_state(server_state);
 
@@ -76,29 +66,4 @@ async fn main() {
 
 async fn root_handler() -> &'static str {
     "Satellite online."
-}
-
-async fn graphiql_handler() -> impl IntoResponse {
-    Html(
-        GraphiQLSource::build()
-            .endpoint("/graphql")
-            .subscription_endpoint("/graphql")
-            .finish(),
-    )
-}
-
-async fn graphql_handler(
-    State(state): State<ServerState>,
-    mut parts: Parts,
-    req: GraphQLRequest,
-) -> GraphQLResponse {
-    let graphql_schema = state.graphql_schema.clone();
-    let mut request = req.into_inner().data(state.clone());
-
-    let claims_result = Claims::from_request_parts(&mut parts, &state).await;
-    if let Ok(claims_data) = claims_result {
-        request = request.data(claims_data);
-    }
-
-    graphql_schema.execute(request).await.into()
 }

@@ -54,6 +54,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "api-graphql"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "async-graphql-axum",
+ "axum",
+ "kc-core",
+ "serde",
+]
+
+[[package]]
 name = "api-node"
 version = "0.1.0"
 dependencies = [
@@ -1037,10 +1048,9 @@ name = "gateway"
 version = "0.1.0"
 dependencies = [
  "api-app",
+ "api-graphql",
  "api-node",
  "api-user",
- "async-graphql",
- "async-graphql-axum",
  "axum",
  "kc-core",
  "redis",

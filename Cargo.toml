@@ -6,5 +6,6 @@ members = [
     "crates/api-user",
     "crates/api-node",
     "crates/api-app",
+    "crates/api-graphql",
     "crates/web-server",
 ]

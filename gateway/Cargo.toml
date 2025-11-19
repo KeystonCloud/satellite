@@ -8,10 +8,9 @@ kc-core = { path = "../crates/kc-core" }
 api-user = { path = "../crates/api-user" }
 api-node = { path = "../crates/api-node" }
 api-app = { path = "../crates/api-app" }
+api-graphql = { path = "../crates/api-graphql" }
 web-server = { path = "../crates/web-server" }
 axum = "0.8.6"
 tokio = { version = "1.48.0", features = ["full"] }
 redis = { version = "0.32", features = ["tokio-comp", "cluster-async", "json"] }
 sqlx = { version = "0.8", default-features = false, features = [ "runtime-tokio", "postgres", "macros", "chrono", "uuid" ] }
-async-graphql = "7.0.17"
-async-graphql-axum = "7.0.17"
